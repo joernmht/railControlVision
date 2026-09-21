@@ -1,0 +1,129 @@
+# =============================================================================
+# rail-vision-bench — requirements.txt
+#
+# Aim: a benchmark that measures how well OFF-THE-SHELF generative AI
+# (VLM/LLM APIs and local models, single-shot or agentic) turns railway-control
+# imagery — track-diagram panels (Gleisbild/Stelltisch), ESTW/CTC screens,
+# control-room camera or screen-capture streams — into structured, validated
+# topology + state (tracks, switches, signals, derailers, routes) in real time.
+#
+# Python >= 3.11 (3.12 recommended). Lower bounds are known-good as of 2026-09;
+# DO pin exact versions for reproducible benchmark runs:
+#     uv pip compile requirements.txt -o requirements.lock      (or pip-compile)
+# and commit requirements.lock. Optional/heavy blocks are commented out.
+#
+# Not pip-installable but part of the stack:
+#   - n8n (orchestration UI):  docker run -p 5678:5678 n8nio/n8n
+#   - ffmpeg binary (video/RTSP decoding for PyAV/OpenCV) via apt/brew
+# =============================================================================
+
+
+# ---------------------------------------------------------------- core / config / CLI
+pydantic>=2.9                 # benchmark schema (topology JSON, observations, results)
+pydantic-settings>=2.5        # typed settings from .env / env vars
+python-dotenv>=1.0            # API keys from .env
+pyyaml>=6.0                   # task/model/run configs
+jsonschema>=4.23              # validate ground-truth + submissions against schema/v0.json
+orjson>=3.10                  # fast JSON I/O for large result sets
+typer>=0.12                   # CLI: `bench run`, `bench eval`, `bench report`
+rich>=13.7                    # console tables/progress
+tqdm>=4.66
+tenacity>=8.4                 # retries/back-off for provider APIs
+httpx>=0.27                   # async HTTP (provider calls, harness client)
+
+
+# ---------------------------------------------------------------- image / video I/O
+pillow>=11.0                  # crop/zoom pipeline, EXIF, rendering of reference schematics
+pillow-heif>=0.18             # HEIC/HEIF phone photos of panels
+numpy>=2.0
+opencv-python-headless>=4.10  # perspective correction, tile-seam detection, frame decoding
+av>=13.0                      # PyAV: RTSP / video streams for real-time frame ingestion
+imageio>=2.35
+imageio-ffmpeg>=0.5           # bundled ffmpeg for imageio (fallback)
+mss>=9.0                      # cross-platform screen capture of live control screens (ESTW/CTC)
+scikit-image>=0.24            # glare/blur metrics for difficulty splits
+
+
+# ---------------------------------------------------------------- synthetic data + augmentation
+svgwrite>=1.4                 # render random stations in tile style (ground truth by construction)
+cairosvg>=2.7                 # SVG -> PNG (needs libcairo on the host)
+albumentations>=1.4           # perspective, glare, occlusion, JPEG artefacts, motion blur
+shapely>=2.0                  # geometry checks for synthetic layouts (diagonals, seams)
+matplotlib>=3.9               # plots for reports; schematic re-render for visual back-check
+
+
+# ---------------------------------------------------------------- generative AI providers (out of the box)
+anthropic>=0.100              # Claude API (vision, tool use, batches)
+openai>=1.60                  # OpenAI-compatible endpoints (also many local servers)
+google-genai>=1.0             # Gemini (new SDK; replaces google-generativeai)
+mistralai>=1.0                # Pixtral / Mistral vision
+ollama>=0.4                   # local models via Ollama (Qwen-VL, LLaVA, ...)
+litellm>=1.60                 # unified router so every model runs through one interface
+
+
+# ---------------------------------------------------------------- agent frameworks (agentic baseline vs. single-shot)
+langchain>=1.0
+langchain-core>=1.0
+langgraph>=1.0                # durable graphs: Planner -> Reader -> Interpreter -> Geometer -> Builder -> Critic loop
+deepagents>=0.5               # LangChain Deep Agents harness (planning, sub-agents, filesystem, context mgmt)
+langchain-anthropic>=1.0
+langchain-openai>=1.0
+langchain-google-genai>=2.0
+langchain-mcp-adapters>=0.1   # expose crop/read/validate/render tools via MCP (also usable from n8n)
+langsmith>=0.3                # tracing of tool calls per run (optional but recommended for benchmark logs)
+
+
+# ---------------------------------------------------------------- graph model + evaluation metrics
+networkx>=3.3                 # topology graph, isomorphism, reachability queries (routes)
+scipy>=1.14                   # Hungarian matching (linear_sum_assignment) for element matching
+rapidfuzz>=3.9                # fuzzy label matching (e.g. "13 ab" vs "13ab")
+jiwer>=3.0                    # CER/WER on transcribed labels
+scikit-learn>=1.5             # calibration (Brier, reliability), P/R/F1 helpers
+pandas>=2.2                   # result tables, per-split aggregation
+pyarrow>=17.0                 # parquet result store
+
+
+# ---------------------------------------------------------------- real-time harness (latency / throughput measurement)
+fastapi>=0.115                # /frame endpoint: image or stream chunk in -> structured JSON out
+uvicorn[standard]>=0.30
+websockets>=13.0              # streaming frames + incremental answers
+python-multipart>=0.0.9       # file uploads to the harness
+prometheus-client>=0.20       # latency/throughput/cost counters per model
+
+
+# ---------------------------------------------------------------- dataset hosting / versioning
+huggingface_hub>=0.25         # publish/download benchmark splits
+datasets>=3.0                 # dataset loading, streaming
+dvc>=3.50                     # data version control for raw photos/videos + ground truth
+# dvc[s3]>=3.50               # remote storage (uncomment for S3/MinIO)
+
+
+# ---------------------------------------------------------------- experiment tracking + reporting
+mlflow>=2.15                  # runs, params, metrics, artefacts (renders, JSON, notes)
+jinja2>=3.1                   # HTML leaderboard / per-task report
+tabulate>=0.9
+# wandb>=0.17                 # alternative tracker
+
+
+# ---------------------------------------------------------------- dev / QA
+pytest>=8.3
+pytest-cov>=5.0
+pytest-asyncio>=0.24
+hypothesis>=6.110             # property tests for the graph validator (degree rules, DKW path sets)
+ruff>=0.6
+mypy>=1.11
+pre-commit>=3.8
+nbstripout>=0.7
+jupyterlab>=4.2               # exploration notebooks (crops, error analysis)
+
+
+# ---------------------------------------------------------------- optional: local open-weight VLMs (GPU)
+# torch>=2.4                  # pick the wheel matching your CUDA/ROCm
+# torchvision>=0.19
+# transformers>=4.45
+# accelerate>=0.34
+# qwen-vl-utils>=0.0.8
+# vllm>=0.6                   # OpenAI-compatible serving of local VLMs (then use `openai` client above)
+
+# ---------------------------------------------------------------- optional: annotation tooling
+# label-studio>=1.13          # manual ground-truth labelling / correction UI

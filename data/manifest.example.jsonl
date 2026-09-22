@@ -1,0 +1,2 @@
+{"scene_id":"minimal","split":"synthetic_clean","partition":"test","difficulty":"easy","source_kind":"synthetic","image":"data/synthetic/example/minimal.png","gt":"schema/examples/v0/minimal.json","width":400,"height":100,"license":null,"quality":null}
+{"scene_id":"station_dkw","split":"synthetic_clean","partition":"dev","difficulty":"easy","source_kind":"synthetic","image":"data/synthetic/example/station_dkw.png","gt":"schema/examples/v0/station_dkw.json","width":800,"height":400,"license":null,"quality":null}

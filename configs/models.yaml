@@ -1,0 +1,56 @@
+# Model catalogue (rail_vision_bench.config.ModelCatalogue): exactly one entry per provider
+# name in PROVIDER_NAMES. `name` is what run configs and `bench run --model` reference,
+# `provider` selects the registry factory, `model_id` is what the SDK receives.
+# Costs are USD per 1k tokens and are only used for the cost_usd metric; every model_id and
+# cost line is marked so nobody trusts it without checking the provider's current price list.
+models:
+  - name: claude-opus-5
+    provider: anthropic
+    model_id: claude-opus-5  # verify against provider docs
+    supports_tools: true
+    cost_per_1k_in: 0.005  # verify against provider docs
+    cost_per_1k_out: 0.025  # verify against provider docs
+    params: {}
+
+  - name: gpt-4o
+    provider: openai
+    model_id: gpt-4o  # verify against provider docs
+    supports_tools: true
+    cost_per_1k_in: 0.0025  # verify against provider docs
+    cost_per_1k_out: 0.01  # verify against provider docs
+    params:
+      # null = api.openai.com; point this (or OPENAI_BASE_URL) at any OpenAI-compatible
+      # server such as vLLM (http://localhost:8000/v1) to run a local open-weight VLM
+      base_url: null
+
+  - name: gemini-2.5-flash
+    provider: gemini
+    model_id: gemini-2.5-flash  # verify against provider docs
+    supports_tools: true
+    cost_per_1k_in: 0.0003  # verify against provider docs
+    cost_per_1k_out: 0.0025  # verify against provider docs
+    params: {}
+
+  - name: pixtral-12b
+    provider: mistral
+    model_id: pixtral-12b-2409  # verify against provider docs
+    supports_tools: false
+    cost_per_1k_in: 0.00015  # verify against provider docs
+    cost_per_1k_out: 0.00015  # verify against provider docs
+    params: {}
+
+  - name: qwen2.5vl-7b
+    provider: ollama
+    model_id: qwen2.5vl:7b  # verify against provider docs (ollama.com/library)
+    supports_tools: false
+    cost_per_1k_in: 0.0  # local inference; verify against provider docs if served remotely
+    cost_per_1k_out: 0.0  # local inference; verify against provider docs if served remotely
+    params: {}
+
+  - name: litellm-claude-opus-5
+    provider: litellm
+    model_id: anthropic/claude-opus-5  # verify against provider docs (litellm provider prefix)
+    supports_tools: true
+    cost_per_1k_in: 0.005  # verify against provider docs
+    cost_per_1k_out: 0.025  # verify against provider docs
+    params: {}

@@ -1,0 +1,16 @@
+# Task (rail_vision_bench.config.TaskConfig): which split is read, which packaged prompt
+# drives the model and which metrics (names from eval.metrics.METRIC_NAMES) the run reports.
+name: panel_topology
+description: Transcribe one panel image into the complete schema v0 topology, trackside elements, routes and state.
+source_kind: panel_photo
+split: synthetic_clean
+prompt: single_shot
+metrics:
+  - detection_prf1
+  - label_cer
+  - state_accuracy
+  - route_prf1
+  - topology_agreement
+  - calibration_ece
+  - latency_p95_ms
+  - cost_usd

@@ -1,0 +1,14 @@
+# Example run (rail_vision_bench.config.RunConfig) used by `make dry-run` and CI.
+# `task` and `catalogue` are resolved relative to the current working directory, so run
+# `bench run --config configs/run.example.yaml --dry-run` from the repository root.
+name: smoke
+task: configs/tasks/panel_topology.yaml
+catalogue: configs/models.yaml
+models:
+  - claude-opus-5
+mode: single_shot
+limit: 5
+seed: 0
+max_rounds: 3
+out_dir: runs
+tracker: "null"

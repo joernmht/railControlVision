@@ -1,0 +1,31 @@
+# The non-pip parts of the local stack named in requirements.txt: n8n (orchestration UI)
+# and an MLflow tracking server. Nothing else runs in containers; the bench itself is a venv.
+#
+# Bumping the pins:
+#   n8n    -> pick a release tag from https://github.com/n8n-io/n8n/releases (Docker Hub n8nio/n8n).
+#   mlflow -> keep the tag equal to the mlflow version in requirements.lock (`grep ^mlflow==`);
+#             the client in the venv and the server should be the same version.
+name: rail-vision-bench
+
+services:
+  n8n:
+    image: n8nio/n8n:2.41.0
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: localhost
+      GENERIC_TIMEZONE: Europe/Berlin
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.16.1
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --artifacts-destination /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+
+volumes:
+  n8n_data:
+  mlflow_data:

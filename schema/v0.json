@@ -1,0 +1,1149 @@
+{
+  "$defs": {
+    "Derailer": {
+      "additionalProperties": false,
+      "description": "A derailer (Gleissperre) attached to an edge.",
+      "properties": {
+        "at": {
+          "$ref": "#/$defs/EdgeAttachment"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geometry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "required": [
+        "id",
+        "at"
+      ],
+      "title": "Derailer",
+      "type": "object"
+    },
+    "DerailerPosition": {
+      "description": "Derailer position.",
+      "enum": [
+        "applied",
+        "removed",
+        "unknown"
+      ],
+      "title": "DerailerPosition",
+      "type": "string"
+    },
+    "DerailerState": {
+      "additionalProperties": false,
+      "description": "State of a derailer.",
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "position": {
+          "$ref": "#/$defs/DerailerPosition",
+          "default": "unknown"
+        }
+      },
+      "title": "DerailerState",
+      "type": "object"
+    },
+    "Direction": {
+      "description": "Travel direction along an edge, relative to its ``a`` -> ``b`` orientation.",
+      "enum": [
+        "a_to_b",
+        "b_to_a"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "EdgeAttachment": {
+      "additionalProperties": false,
+      "description": "Position of a trackside element on an edge.",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/Direction",
+          "description": "The travel direction the element governs."
+        },
+        "edge": {
+          "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "Edge",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0.5,
+          "description": "Position along the edge from a (0.0) to b (1.0).",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Offset",
+          "type": "number"
+        }
+      },
+      "required": [
+        "edge",
+        "direction"
+      ],
+      "title": "EdgeAttachment",
+      "type": "object"
+    },
+    "Geometry": {
+      "additionalProperties": false,
+      "description": "Pixel geometry of an element in the coordinate system of ``source.image``.",
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "[x0, y0, x1, y1] in pixels of source.image.",
+          "title": "Bbox"
+        },
+        "point": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "[x, y] in pixels of source.image.",
+          "title": "Point"
+        },
+        "polyline": {
+          "anyOf": [
+            {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "[[x, y], ...] in pixels of source.image.",
+          "title": "Polyline"
+        }
+      },
+      "title": "Geometry",
+      "type": "object"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "description": "A topology node.",
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geometry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "half_labels": {
+          "description": "Labels of the two switch halves of a dkw/ekw, e.g. ['12a', '12b'].",
+          "items": {
+            "type": "string"
+          },
+          "title": "Half Labels",
+          "type": "array"
+        },
+        "id": {
+          "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/NodeKind"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "Node",
+      "type": "object"
+    },
+    "NodeKind": {
+      "description": "Kinds of topology nodes (track ends, joints, switches and crossings).",
+      "enum": [
+        "buffer_stop",
+        "boundary",
+        "joint",
+        "switch",
+        "crossing",
+        "ekw",
+        "dkw"
+      ],
+      "title": "NodeKind",
+      "type": "string"
+    },
+    "Occupancy": {
+      "description": "Track occupancy.",
+      "enum": [
+        "free",
+        "occupied",
+        "unknown"
+      ],
+      "title": "Occupancy",
+      "type": "string"
+    },
+    "Port": {
+      "description": "Ports of a node; which ones exist depends on the node kind.\n\nbuffer_stop and boundary expose A; joint exposes A and B; switch exposes toe,\nstraight and diverging; crossing, ekw and dkw expose A, B, C and D where A and\nB lie on one side and C and D on the other (straight paths A-C and B-D, slip\npaths A-D for ekw and dkw, B-C for dkw only).",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "toe",
+        "straight",
+        "diverging"
+      ],
+      "title": "Port",
+      "type": "string"
+    },
+    "PortRef": {
+      "additionalProperties": false,
+      "description": "One end of an edge: a node and the port it plugs into.",
+      "properties": {
+        "node": {
+          "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "Node",
+          "type": "string"
+        },
+        "port": {
+          "$ref": "#/$defs/Port"
+        }
+      },
+      "required": [
+        "node",
+        "port"
+      ],
+      "title": "PortRef",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "Who or what produced the document.",
+      "properties": {
+        "annotator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annotator"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created At"
+        },
+        "kind": {
+          "$ref": "#/$defs/ProvenanceKind"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Id"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "ProvenanceKind": {
+      "description": "Whether a document is ground truth or a model prediction.",
+      "enum": [
+        "ground_truth",
+        "prediction"
+      ],
+      "title": "ProvenanceKind",
+      "type": "string"
+    },
+    "Route": {
+      "additionalProperties": false,
+      "description": "A route (Fahrstrasse) from a start signal over an ordered list of edges.",
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "end": {
+          "description": "Id of the end signal or end node.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "End",
+          "type": "string"
+        },
+        "id": {
+          "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "path": {
+          "description": "Edge ids ordered from start to end.",
+          "items": {
+            "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Path",
+          "type": "array"
+        },
+        "start": {
+          "description": "Id of the start signal.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "Start",
+          "type": "string"
+        },
+        "switch_positions": {
+          "description": "Required setting per switching node: a position for a switch, a [Port, Port] path for a dkw/ekw.",
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SwitchPosition"
+                },
+                {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "$ref": "#/$defs/Port"
+                    },
+                    {
+                      "$ref": "#/$defs/Port"
+                    }
+                  ],
+                  "type": "array"
+                }
+              ]
+            }
+          },
+          "propertyNames": {
+            "description": "Identifier of a node, edge, signal, derailer, route or scene."
+          },
+          "title": "Switch Positions",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end",
+        "path"
+      ],
+      "title": "Route",
+      "type": "object"
+    },
+    "RouteState": {
+      "additionalProperties": false,
+      "description": "State of a route.",
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "status": {
+          "$ref": "#/$defs/RouteStatus",
+          "default": "unknown"
+        }
+      },
+      "title": "RouteState",
+      "type": "object"
+    },
+    "RouteStatus": {
+      "description": "Route (Fahrstrasse) status.",
+      "enum": [
+        "not_set",
+        "set",
+        "locked",
+        "releasing",
+        "unknown"
+      ],
+      "title": "RouteStatus",
+      "type": "string"
+    },
+    "Signal": {
+      "additionalProperties": false,
+      "description": "A signal attached to an edge.",
+      "properties": {
+        "at": {
+          "$ref": "#/$defs/EdgeAttachment"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geometry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SignalKind"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "system": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Signalling system, e.g. H/V, Ks, Hl.",
+          "title": "System"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "at"
+      ],
+      "title": "Signal",
+      "type": "object"
+    },
+    "SignalAspect": {
+      "description": "Signal aspects; the literal indication (Hp0, Vr2, Ks1, ...) goes into ``raw``.",
+      "enum": [
+        "stop",
+        "proceed",
+        "proceed_reduced",
+        "expect_stop",
+        "expect_proceed",
+        "expect_proceed_reduced",
+        "shunt_proceed",
+        "dark",
+        "unknown"
+      ],
+      "title": "SignalAspect",
+      "type": "string"
+    },
+    "SignalKind": {
+      "description": "Kinds of signals.",
+      "enum": [
+        "main",
+        "distant",
+        "shunt",
+        "combined",
+        "repeater",
+        "block_marker",
+        "unknown"
+      ],
+      "title": "SignalKind",
+      "type": "string"
+    },
+    "SignalState": {
+      "additionalProperties": false,
+      "description": "State of a signal.",
+      "properties": {
+        "aspect": {
+          "$ref": "#/$defs/SignalAspect",
+          "default": "unknown"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transcribed aspect, e.g. 'Hp0', 'Vr2'.",
+          "title": "Raw"
+        }
+      },
+      "title": "SignalState",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "description": "The source image the document describes.",
+      "properties": {
+        "frame_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frame Index"
+        },
+        "height": {
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "image": {
+          "description": "Image path relative to the dataset root.",
+          "title": "Image",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "timestamp_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timestamp Ms"
+        },
+        "width": {
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "image",
+        "width",
+        "height"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "SourceKind": {
+      "description": "Where the source image comes from.",
+      "enum": [
+        "synthetic",
+        "panel_photo",
+        "estw_screen",
+        "ctc_screen",
+        "stream_frame"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "State": {
+      "additionalProperties": false,
+      "description": "Observed state keyed by element id.",
+      "properties": {
+        "derailers": {
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$": {
+              "$ref": "#/$defs/DerailerState"
+            }
+          },
+          "propertyNames": {
+            "description": "Identifier of a node, edge, signal, derailer, route or scene."
+          },
+          "title": "Derailers",
+          "type": "object"
+        },
+        "observed_at_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed At Ms"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$": {
+              "$ref": "#/$defs/RouteState"
+            }
+          },
+          "propertyNames": {
+            "description": "Identifier of a node, edge, signal, derailer, route or scene."
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signals": {
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$": {
+              "$ref": "#/$defs/SignalState"
+            }
+          },
+          "propertyNames": {
+            "description": "Identifier of a node, edge, signal, derailer, route or scene."
+          },
+          "title": "Signals",
+          "type": "object"
+        },
+        "switches": {
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$": {
+              "$ref": "#/$defs/SwitchState"
+            }
+          },
+          "propertyNames": {
+            "description": "Identifier of a node, edge, signal, derailer, route or scene."
+          },
+          "title": "Switches",
+          "type": "object"
+        },
+        "tracks": {
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$": {
+              "$ref": "#/$defs/TrackState"
+            }
+          },
+          "propertyNames": {
+            "description": "Identifier of a node, edge, signal, derailer, route or scene."
+          },
+          "title": "Tracks",
+          "type": "object"
+        }
+      },
+      "title": "State",
+      "type": "object"
+    },
+    "SwitchPosition": {
+      "description": "Geometric position of a plain switch; the panel's +/- indication goes into ``raw``.",
+      "enum": [
+        "straight",
+        "diverging",
+        "moving",
+        "unknown"
+      ],
+      "title": "SwitchPosition",
+      "type": "string"
+    },
+    "SwitchState": {
+      "additionalProperties": false,
+      "description": "State of a switching node; ``position`` for a switch, ``active_paths`` for a dkw/ekw.",
+      "properties": {
+        "active_paths": {
+          "anyOf": [
+            {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "$ref": "#/$defs/Port"
+                  },
+                  {
+                    "$ref": "#/$defs/Port"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Zero, one or two simultaneously connected port pairs.",
+          "title": "Active Paths"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SwitchPosition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transcribed indication, e.g. '+', '-', '12a:+ 12b:-'.",
+          "title": "Raw"
+        }
+      },
+      "title": "SwitchState",
+      "type": "object"
+    },
+    "Topology": {
+      "additionalProperties": false,
+      "description": "Nodes and edges of the track graph.",
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/Track"
+          },
+          "title": "Edges",
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/Node"
+          },
+          "title": "Nodes",
+          "type": "array"
+        }
+      },
+      "title": "Topology",
+      "type": "object"
+    },
+    "Track": {
+      "additionalProperties": false,
+      "description": "A track section (edge) between two node ports.",
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/PortRef"
+        },
+        "b": {
+          "$ref": "#/$defs/PortRef"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geometry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/TrackKind",
+          "default": "unknown"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "required": [
+        "id",
+        "a",
+        "b"
+      ],
+      "title": "Track",
+      "type": "object"
+    },
+    "TrackKind": {
+      "description": "Kinds of track sections (edges).",
+      "enum": [
+        "main",
+        "siding",
+        "platform",
+        "yard",
+        "unknown"
+      ],
+      "title": "TrackKind",
+      "type": "string"
+    },
+    "TrackState": {
+      "additionalProperties": false,
+      "description": "State of a track section: occupancy and route illumination are independent.",
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "occupancy": {
+          "$ref": "#/$defs/Occupancy",
+          "default": "unknown"
+        },
+        "route_set": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fahrstrassenausleuchtung, independent of occupancy.",
+          "title": "Route Set"
+        }
+      },
+      "title": "TrackState",
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/joernmht/railControlVision/schema/v0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A complete annotation of one scene: topology, trackside elements, routes and state.",
+  "properties": {
+    "derailers": {
+      "items": {
+        "$ref": "#/$defs/Derailer"
+      },
+      "title": "Derailers",
+      "type": "array"
+    },
+    "meta": {
+      "additionalProperties": true,
+      "description": "Free-form notes (station name, difficulty tags, ...).",
+      "title": "Meta",
+      "type": "object"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "routes": {
+      "items": {
+        "$ref": "#/$defs/Route"
+      },
+      "title": "Routes",
+      "type": "array"
+    },
+    "scene_id": {
+      "description": "Identifier of a node, edge, signal, derailer, route or scene.",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$",
+      "title": "Scene Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "v0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signals": {
+      "items": {
+        "$ref": "#/$defs/Signal"
+      },
+      "title": "Signals",
+      "type": "array"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    },
+    "state": {
+      "$ref": "#/$defs/State"
+    },
+    "topology": {
+      "$ref": "#/$defs/Topology"
+    }
+  },
+  "required": [
+    "schema_version",
+    "scene_id",
+    "source",
+    "provenance",
+    "topology",
+    "state"
+  ],
+  "title": "SceneAnnotation",
+  "type": "object"
+}

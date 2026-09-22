@@ -1,0 +1,152 @@
+{
+  "schema_version": "v0",
+  "scene_id": "minimal",
+  "source": {
+    "kind": "synthetic",
+    "image": "data/synthetic/example/minimal.png",
+    "width": 400,
+    "height": 100,
+    "frame_index": null,
+    "timestamp_ms": null
+  },
+  "provenance": {
+    "kind": "ground_truth",
+    "run_id": null,
+    "model_id": null,
+    "annotator": "spec",
+    "tool": "hand-written",
+    "created_at": "2026-09-21T00:00:00Z"
+  },
+  "topology": {
+    "nodes": [
+      {
+        "id": "n_w",
+        "kind": "boundary",
+        "geometry": {
+          "point": [
+            20,
+            50
+          ]
+        }
+      },
+      {
+        "id": "n_j",
+        "kind": "joint",
+        "label": "1-2",
+        "geometry": {
+          "point": [
+            200,
+            50
+          ]
+        }
+      },
+      {
+        "id": "n_e",
+        "kind": "boundary",
+        "geometry": {
+          "point": [
+            380,
+            50
+          ]
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "kind": "main",
+        "a": {
+          "node": "n_w",
+          "port": "A"
+        },
+        "b": {
+          "node": "n_j",
+          "port": "A"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              20,
+              50
+            ],
+            [
+              200,
+              50
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e2",
+        "kind": "main",
+        "a": {
+          "node": "n_j",
+          "port": "B"
+        },
+        "b": {
+          "node": "n_e",
+          "port": "A"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              200,
+              50
+            ],
+            [
+              380,
+              50
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "signals": [
+    {
+      "id": "e1",
+      "kind": "main",
+      "label": "A",
+      "system": "H/V",
+      "at": {
+        "edge": "e1",
+        "offset": 0.9,
+        "direction": "a_to_b"
+      },
+      "geometry": {
+        "bbox": [
+          150,
+          30,
+          170,
+          45
+        ]
+      }
+    }
+  ],
+  "derailers": [],
+  "routes": [],
+  "state": {
+    "switches": {},
+    "signals": {
+      "e1": {
+        "aspect": "proceed",
+        "raw": "Hp1",
+        "confidence": 1.0
+      }
+    },
+    "tracks": {
+      "e1": {
+        "occupancy": "free",
+        "route_set": false
+      },
+      "e2": {
+        "occupancy": "free",
+        "route_set": false
+      }
+    },
+    "derailers": {},
+    "routes": {},
+    "observed_at_ms": null
+  },
+  "meta": {}
+}

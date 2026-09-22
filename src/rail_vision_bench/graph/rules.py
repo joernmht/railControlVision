@@ -125,7 +125,9 @@ def switch_position_for(path: frozenset[Port]) -> SwitchPosition | None:
     return None
 
 
-def expected_setting(kind: NodeKind, path: frozenset[Port]) -> SwitchPosition | frozenset[Port] | None:
+def expected_setting(
+    kind: NodeKind, path: frozenset[Port]
+) -> SwitchPosition | frozenset[Port] | None:
     """Return the switch setting a route must declare to traverse ``path`` at a node.
 
     Args:

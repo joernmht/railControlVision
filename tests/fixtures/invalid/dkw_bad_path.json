@@ -1,0 +1,610 @@
+{
+  "schema_version": "v0",
+  "scene_id": "station_dkw",
+  "source": {
+    "kind": "synthetic",
+    "image": "data/synthetic/example/station_dkw.png",
+    "width": 800,
+    "height": 400,
+    "frame_index": null,
+    "timestamp_ms": null
+  },
+  "provenance": {
+    "kind": "ground_truth",
+    "run_id": null,
+    "model_id": null,
+    "annotator": "spec",
+    "tool": "hand-written",
+    "created_at": "2026-09-21T00:00:00Z"
+  },
+  "topology": {
+    "nodes": [
+      {
+        "id": "n_w",
+        "kind": "boundary",
+        "geometry": {
+          "point": [
+            20,
+            200
+          ],
+          "bbox": [
+            5,
+            185,
+            35,
+            215
+          ]
+        }
+      },
+      {
+        "id": "sw1",
+        "kind": "switch",
+        "label": "1",
+        "geometry": {
+          "point": [
+            150,
+            200
+          ],
+          "bbox": [
+            135,
+            185,
+            165,
+            215
+          ]
+        }
+      },
+      {
+        "id": "dkw1",
+        "kind": "dkw",
+        "label": "12",
+        "half_labels": [
+          "12a",
+          "12b"
+        ],
+        "geometry": {
+          "point": [
+            350,
+            200
+          ],
+          "bbox": [
+            335,
+            185,
+            365,
+            215
+          ]
+        }
+      },
+      {
+        "id": "sw2",
+        "kind": "switch",
+        "label": "2",
+        "geometry": {
+          "point": [
+            550,
+            200
+          ],
+          "bbox": [
+            535,
+            185,
+            565,
+            215
+          ]
+        }
+      },
+      {
+        "id": "n_e",
+        "kind": "boundary",
+        "geometry": {
+          "point": [
+            780,
+            200
+          ],
+          "bbox": [
+            765,
+            185,
+            795,
+            215
+          ]
+        }
+      },
+      {
+        "id": "n_j1",
+        "kind": "joint",
+        "geometry": {
+          "point": [
+            500,
+            120
+          ],
+          "bbox": [
+            485,
+            105,
+            515,
+            135
+          ]
+        }
+      },
+      {
+        "id": "n_bs1",
+        "kind": "buffer_stop",
+        "geometry": {
+          "point": [
+            700,
+            120
+          ],
+          "bbox": [
+            685,
+            105,
+            715,
+            135
+          ]
+        }
+      },
+      {
+        "id": "n_bs2",
+        "kind": "buffer_stop",
+        "geometry": {
+          "point": [
+            700,
+            280
+          ],
+          "bbox": [
+            685,
+            265,
+            715,
+            295
+          ]
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "kind": "main",
+        "a": {
+          "node": "n_w",
+          "port": "A"
+        },
+        "b": {
+          "node": "sw1",
+          "port": "toe"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              20,
+              200
+            ],
+            [
+              150,
+              200
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e2",
+        "kind": "main",
+        "a": {
+          "node": "sw1",
+          "port": "straight"
+        },
+        "b": {
+          "node": "dkw1",
+          "port": "A"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              150,
+              200
+            ],
+            [
+              350,
+              200
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e3",
+        "kind": "siding",
+        "a": {
+          "node": "sw1",
+          "port": "diverging"
+        },
+        "b": {
+          "node": "dkw1",
+          "port": "B"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              150,
+              200
+            ],
+            [
+              250,
+              230
+            ],
+            [
+              350,
+              200
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e4",
+        "kind": "main",
+        "a": {
+          "node": "dkw1",
+          "port": "C"
+        },
+        "b": {
+          "node": "sw2",
+          "port": "straight"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              350,
+              200
+            ],
+            [
+              550,
+              200
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e5",
+        "kind": "platform",
+        "a": {
+          "node": "dkw1",
+          "port": "D"
+        },
+        "b": {
+          "node": "n_j1",
+          "port": "A"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              350,
+              200
+            ],
+            [
+              500,
+              120
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e6",
+        "kind": "platform",
+        "a": {
+          "node": "n_j1",
+          "port": "B"
+        },
+        "b": {
+          "node": "n_bs1",
+          "port": "A"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              500,
+              120
+            ],
+            [
+              700,
+              120
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e7",
+        "kind": "main",
+        "a": {
+          "node": "sw2",
+          "port": "toe"
+        },
+        "b": {
+          "node": "n_e",
+          "port": "A"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              550,
+              200
+            ],
+            [
+              780,
+              200
+            ]
+          ]
+        }
+      },
+      {
+        "id": "e8",
+        "kind": "siding",
+        "a": {
+          "node": "sw2",
+          "port": "diverging"
+        },
+        "b": {
+          "node": "n_bs2",
+          "port": "A"
+        },
+        "geometry": {
+          "polyline": [
+            [
+              550,
+              200
+            ],
+            [
+              700,
+              280
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "signals": [
+    {
+      "id": "sig_a",
+      "kind": "distant",
+      "label": "a",
+      "system": "H/V",
+      "at": {
+        "edge": "e1",
+        "offset": 0.2,
+        "direction": "a_to_b"
+      },
+      "geometry": {
+        "bbox": [
+          40,
+          170,
+          60,
+          190
+        ]
+      }
+    },
+    {
+      "id": "sig_A",
+      "kind": "main",
+      "label": "A",
+      "system": "H/V",
+      "at": {
+        "edge": "e1",
+        "offset": 0.75,
+        "direction": "a_to_b"
+      },
+      "geometry": {
+        "bbox": [
+          90,
+          170,
+          110,
+          190
+        ]
+      }
+    },
+    {
+      "id": "sig_F",
+      "kind": "main",
+      "label": "F",
+      "system": "H/V",
+      "at": {
+        "edge": "e7",
+        "offset": 0.7,
+        "direction": "b_to_a"
+      },
+      "geometry": {
+        "bbox": [
+          690,
+          210,
+          710,
+          230
+        ]
+      }
+    },
+    {
+      "id": "sig_N1",
+      "kind": "main",
+      "label": "N1",
+      "system": "H/V",
+      "at": {
+        "edge": "e6",
+        "offset": 0.3,
+        "direction": "b_to_a"
+      },
+      "geometry": {
+        "bbox": [
+          560,
+          90,
+          580,
+          110
+        ]
+      }
+    },
+    {
+      "id": "sig_Ls1",
+      "kind": "shunt",
+      "label": "Ls1",
+      "system": "H/V",
+      "at": {
+        "edge": "e8",
+        "offset": 0.4,
+        "direction": "b_to_a"
+      },
+      "geometry": {
+        "bbox": [
+          600,
+          290,
+          620,
+          310
+        ]
+      }
+    }
+  ],
+  "derailers": [
+    {
+      "id": "der_1",
+      "label": "Gs1",
+      "at": {
+        "edge": "e8",
+        "offset": 0.7,
+        "direction": "b_to_a"
+      },
+      "geometry": {
+        "bbox": [
+          640,
+          270,
+          660,
+          290
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "id": "rt_A_1",
+      "label": "A -> N1",
+      "start": "sig_A",
+      "end": "sig_N1",
+      "path": [
+        "e1",
+        "e3",
+        "e5",
+        "e6"
+      ],
+      "switch_positions": {
+        "sw1": "diverging",
+        "dkw1": [
+          "B",
+          "D"
+        ]
+      }
+    },
+    {
+      "id": "rt_F_main",
+      "label": "F -> west",
+      "start": "sig_F",
+      "end": "n_w",
+      "path": [
+        "e7",
+        "e4",
+        "e2",
+        "e1"
+      ],
+      "switch_positions": {
+        "sw2": "straight",
+        "dkw1": [
+          "A",
+          "C"
+        ],
+        "sw1": "straight"
+      }
+    }
+  ],
+  "state": {
+    "switches": {
+      "sw1": {
+        "position": "diverging",
+        "raw": "-",
+        "confidence": 1.0
+      },
+      "sw2": {
+        "position": "straight",
+        "raw": "+"
+      },
+      "dkw1": {
+        "active_paths": [
+          [
+            "A",
+            "B"
+          ]
+        ],
+        "raw": "12a:+ 12b:+"
+      }
+    },
+    "signals": {
+      "sig_a": {
+        "aspect": "expect_proceed_reduced",
+        "raw": "Vr2"
+      },
+      "sig_A": {
+        "aspect": "proceed_reduced",
+        "raw": "Hp2"
+      },
+      "sig_F": {
+        "aspect": "stop",
+        "raw": "Hp0"
+      },
+      "sig_N1": {
+        "aspect": "stop",
+        "raw": "Hp0"
+      },
+      "sig_Ls1": {
+        "aspect": "stop",
+        "raw": "Sh0"
+      }
+    },
+    "tracks": {
+      "e1": {
+        "occupancy": "free",
+        "route_set": true
+      },
+      "e2": {
+        "occupancy": "free",
+        "route_set": false
+      },
+      "e3": {
+        "occupancy": "free",
+        "route_set": true
+      },
+      "e4": {
+        "occupancy": "free",
+        "route_set": false
+      },
+      "e5": {
+        "occupancy": "free",
+        "route_set": true
+      },
+      "e6": {
+        "occupancy": "free",
+        "route_set": true
+      },
+      "e7": {
+        "occupancy": "free",
+        "route_set": false
+      },
+      "e8": {
+        "occupancy": "occupied",
+        "route_set": false
+      }
+    },
+    "derailers": {
+      "der_1": {
+        "position": "applied"
+      }
+    },
+    "routes": {
+      "rt_A_1": {
+        "status": "set"
+      },
+      "rt_F_main": {
+        "status": "not_set"
+      }
+    },
+    "observed_at_ms": null
+  },
+  "meta": {
+    "station": "Beispielbahnhof",
+    "difficulty": "easy"
+  }
+}

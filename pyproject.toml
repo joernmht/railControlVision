@@ -1,0 +1,119 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rail-vision-bench"
+version = "0.0.1"
+description = "Benchmark: how well off-the-shelf generative AI turns railway-control imagery into validated topology + state."
+requires-python = ">=3.11"
+classifiers = [
+  "Private :: Do Not Upload",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dynamic = ["dependencies"]
+# no `readme` (README.md is authored last) and no `license` (not chosen yet) on purpose
+
+[project.optional-dependencies]
+gpu = ["torch>=2.4", "torchvision>=0.19", "transformers>=4.45", "accelerate>=0.34", "qwen-vl-utils>=0.0.8"]
+vllm = ["vllm>=0.6"]
+s3 = ["dvc[s3]>=3.50"]
+wandb = ["wandb>=0.17"]
+labeling = ["label-studio>=1.13"]
+
+[project.scripts]
+bench = "rail_vision_bench.cli:app"
+
+[project.urls]
+Repository = "https://github.com/joernmht/railControlVision"
+
+[dependency-groups]
+# dev-only typeshed stubs (setuptools ignores this table; never in the wheel or in requirements.lock)
+typing = [
+  "types-PyYAML==6.0.12.20260906",
+  "types-jsonschema==4.26.0.20260518",
+  "types-networkx==3.6.1.20260911",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rail_vision_bench = ["py.typed", "prompts/*.md", "prompts/agentic/*.md", "report/templates/*.j2"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+# verified: yields 67 base Requires-Dist (incl. uvicorn[standard]>=0.30, huggingface_hub>=0.25) + the extras; the sdist bundles requirements.txt
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+extend-exclude = ["build", "notebooks"]   # ruff lints .ipynb by default; `uv build` leaves build/lib
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "A", "C4", "SIM", "PIE", "PT", "RET", "RUF", "ANN", "D", "N", "TID", "PTH", "ERA", "T20", "PLE", "PLW", "LOG", "G", "FAST", "ASYNC", "PERF"]
+ignore = ["D105", "D107", "ANN401"]
+# not selected on purpose: TC/FA (runtime annotation resolution for typer/FastAPI/pydantic/TypedDict), ARG (stubs), PD/NPY (no pandas/numpy in implemented code), PLC (lazy imports in command bodies need no noqa)
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "ANN"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["rail_vision_bench"]
+combine-as-imports = true
+
+[tool.ruff.lint.flake8-builtins]
+strict-checking = true   # A005 then guards dotted module names against stdlib shadowing (io, types, logging, ...)
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+strict = true
+warn_unreachable = true
+warn_unused_configs = true
+incremental = false          # warn_unused_configs only works in non-incremental mode; the tree is small (~15-25 s)
+pretty = true
+show_error_codes = true
+mypy_path = "src"
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+# NO python_version: numpy 2.5.3 (installed on 3.12 per the lock's marker split) ships PEP 695 `type` statements; forcing 3.11 fails with
+# "numpy/__init__.pyi:737: Type statement is only supported in Python 3.12 and greater [syntax]" (reached through types-networkx). Each CI leg checks with its own interpreter.
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+# there are NO ignore_missing_imports overrides: implemented modules only import typed libraries (pydantic, pydantic-settings, typer, rich, orjson, fastapi, starlette, prometheus-client, langgraph, httpx, uvicorn, hypothesis, pytest) or ones with installed stubs (yaml, jsonschema, networkx); stubs import nothing else. Untyped in the lock (never import at module level): pandas, scipy, sklearn, svgwrite, cairosvg, albumentations, shapely, datasets, tabulate, dvc, tqdm, pyarrow, mistralai.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers --strict-config"
+xfail_strict = true
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error::DeprecationWarning:rail_vision_bench"]
+markers = [
+  "requires_display: needs a real display (mss screen capture); skipped unless DISPLAY is set",
+  "requires_network: needs outbound network or provider keys; skipped unless RVB_NETWORK_TESTS=1",
+  "slow: slow test, deselect with -m 'not slow'",
+]
+
+[tool.coverage.run]
+source_pkgs = ["rail_vision_bench"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+# no fail_under in the skeleton (stubs would make a threshold meaningless)

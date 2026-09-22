@@ -1,0 +1,14 @@
+# normalise line endings to LF for every text file
+* text=auto eol=lf
+
+# imagery, video and columnar result stores are never diffed or normalised
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.heic binary
+*.mp4 binary
+*.parquet binary
+
+# generated files: collapsed in GitHub diffs (no *.ipynb filter: nbstripout runs as a pre-commit hook only)
+requirements.lock linguist-generated=true
+schema/v0.json linguist-generated=true

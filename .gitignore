@@ -1,0 +1,40 @@
+# Python bytecode and packaging leftovers
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# virtual environments; the sanctioned lock is requirements.lock, so uv.lock (from `uv sync`) is never committed
+.venv
+venv
+uv.lock
+
+# tool caches and test/coverage output
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# secrets: only .env.example is committed
+.env
+.env.*.local
+
+# benchmark outputs and local tracking stores
+runs/
+reports/
+mlruns/
+mlartifacts/
+
+# notebooks and editors
+.ipynb_checkpoints/
+.DS_Store
+.idea/
+.vscode/
+
+# data/, .dvc/, .dvcignore and *.dvc are deliberately NOT listed: DVC manages its own ignore entries after `dvc init` / `dvc add`

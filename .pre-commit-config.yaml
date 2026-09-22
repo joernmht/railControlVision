@@ -1,0 +1,40 @@
+minimum_pre_commit_version: "3.8.0"
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: ^requirements\.(txt|lock)$
+      - id: trailing-whitespace
+        exclude: ^requirements\.(txt|lock)$
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+      - id: ruff-format
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (project venv)
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: schema-check
+        name: schema/v0.json matches the pydantic models
+        entry: bench schema export --check
+        language: system
+        pass_filenames: false
+        files: ^(src/rail_vision_bench/schema/.*\.py|schema/v0\.json)$

@@ -1,0 +1,64 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  PYTHONUNBUFFERED: "1"
+  HYPOTHESIS_PROFILE: ci
+  UV_SYSTEM_PYTHON: "0"
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: "0.8.17"                      # the uv that produced requirements.lock; bump together with the lock
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: requirements.lock
+      - name: Install from the lock (+ editable package + typing group)
+        run: make install-ci PY=${{ matrix.python-version }}
+      - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - run: uv pip check
+      - name: Lock in sync with requirements.txt
+        if: matrix.python-version == '3.12'
+        run: make lock-check
+      - run: make lint
+      - run: make typecheck                      # per interpreter on purpose (numpy stub split)
+      - run: make schema-check
+      - run: make validate-examples
+      - run: make dry-run
+      - run: make test-cov
+      - name: Console-script smoke test
+        run: bench --help && bench validate --strict schema/examples/v0/minimal.json
+      - uses: actions/cache@v6
+        if: matrix.python-version == '3.12'
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: pre-commit (mypy already ran above)
+        if: matrix.python-version == '3.12'
+        run: SKIP=mypy pre-commit run --all-files --show-diff-on-failure
+      - name: Wheel builds from the verbatim requirements.txt
+        if: matrix.python-version == '3.12'
+        run: make build-check
+      - name: Compose file lint
+        if: matrix.python-version == '3.12'
+        run: docker compose -f docker/compose.yaml config -q
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: ignore

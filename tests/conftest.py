@@ -9,8 +9,10 @@ from typing import Any
 
 import pytest
 from hypothesis import HealthCheck, settings
+from typer.testing import CliRunner
 
 from rail_vision_bench.schema.models import SceneAnnotation
+from rail_vision_bench.settings import SETTINGS_ENV_KEYS, get_settings
 
 # Deadlines are disabled in both profiles because validation time depends on the
 # generated scene size; the CI profile is derandomized so failures are reproducible.
@@ -60,9 +62,22 @@ def station_dkw_scene(station_dkw_doc: dict[str, Any]) -> SceneAnnotation:
     return SceneAnnotation.model_validate(station_dkw_doc)
 
 
-# G3a adds here: the `cli` fixture (typer.testing.CliRunner) and the autouse
-# `clean_env` fixture that deletes every SETTINGS_ENV_KEYS entry from the
-# environment and calls get_settings.cache_clear().
+@pytest.fixture
+def cli() -> CliRunner:
+    """A runner for invoking the ``bench`` typer app in-process."""
+    return CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate every test from the developer's environment and cached settings.
+
+    Autouse (not requested by name) on purpose: hypothesis rejects function-scoped
+    fixtures named in the signature of a ``@given`` test.
+    """
+    for key in SETTINGS_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    get_settings.cache_clear()
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:

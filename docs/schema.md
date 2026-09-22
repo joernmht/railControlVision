@@ -228,10 +228,10 @@ never raises.
 
 `bench validate --strict`, `validate_document(..., strict=True)` and `POST /validate?strict=true`
 promote `STATE_MISSING`, `GEOM_OUT_OF_BOUNDS` and `ROUTE_SWITCH_MISSING` to errors. Ground
-truth is always validated strictly (CI runs `make validate-examples` in strict mode);
-predictions are scored in the default mode so a model that omits a state entry loses points on
-the state metrics rather than being rejected outright. `tests/fixtures/strict/` holds one document
-per promoted code that is ok in the default mode and fails in strict mode.
+truth is validated strictly (CI runs `make validate-examples` in strict mode); the `validate`
+tool and the harness default to the non-strict mode, the intent being that a prediction which
+omits a state entry loses points on the state metrics rather than being rejected outright.
+`tests/fixtures/strict/` holds documents that are ok in the default mode and fail in strict mode.
 
 ## The two examples
 
@@ -252,8 +252,9 @@ tracks on it lit), and `rt_F_main` from `sig_F` over `[e7, e4, e2, e1]` to node 
 straights active (`[[A, C], [B, D]]`, `raw: "12a:+ 12b:+"`), `sw1` stands diverging (`-`),
 `e8` is occupied and the derailer is applied.
 
-The invalid fixtures in `tests/fixtures/invalid/` are these two documents with exactly one edit
-each and are named after the code they trigger.
+The invalid fixtures in `tests/fixtures/invalid/` are these two documents with one targeted
+edit each and are named after the primary code they trigger (a few edits unavoidably raise a
+secondary code as well; the tests assert the named one).
 
 ## Versioning policy
 

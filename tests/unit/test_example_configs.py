@@ -1,4 +1,4 @@
-"""The committed example configs load through the real config models and cross-reference each other."""
+"""The committed example configs load through the config models and reference each other."""
 
 from __future__ import annotations
 

@@ -286,8 +286,9 @@ def synth_generate(
 
     try:
         manifest = generate_dataset(out, n=n, seed=seed, augment=augment)
-    except NotImplementedError as exc:
-        _not_implemented(exc)
+    except ValueError as exc:
+        # an unknown augmentation preset
+        _fail(f"synth generate: {exc}")
     console.print(f"manifest written to {manifest}", highlight=False)
 
 

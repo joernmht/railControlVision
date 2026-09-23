@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from PIL.Image import Image
+
+GLARE_THRESHOLD: Final[float] = 250.0 / 255.0
+"""Grey level (in ``[0, 1]``) at or above which a pixel counts as saturated glare."""
 
 
 class QualityMetrics(BaseModel):
@@ -26,20 +29,26 @@ class QualityMetrics(BaseModel):
 def measure(image: Image) -> QualityMetrics:
     """Compute the quality metrics of an image.
 
-    Intended implementation: convert to grey with ``skimage.color.rgb2gray``,
-    take the variance of ``skimage.filters.laplace`` for ``blur_var`` and the
-    fraction of pixels above a near-white threshold for ``glare_fraction``.
+    The image is converted to grey with ``skimage.color.rgb2gray``. ``blur_var``
+    is the variance of the 3x3 Laplacian (``cv2.Laplacian``; the same kernel as
+    ``skimage.filters.laplace``, which ships without type information) of that
+    grey image on the 0-255 scale, the scale of the usual "variance of the
+    Laplacian" measure that the ``DifficultyThresholds`` defaults assume;
+    ``glare_fraction`` is the share of pixels whose grey level is at least
+    :data:`GLARE_THRESHOLD`.
 
     Args:
-        image: The source image.
+        image: The source image (any Pillow mode; converted to RGB first).
 
     Returns:
         The measured metrics.
-
-    Raises:
-        NotImplementedError: Always, in the skeleton.
     """
-    raise NotImplementedError(
-        "rail_vision_bench.ingest.quality.measure is not implemented in the skeleton: "
-        "measure blur (Laplacian variance) and glare fraction with scikit-image"
-    )
+    import cv2
+    import numpy as np
+    from skimage.color import rgb2gray
+
+    rgb = np.asarray(image.convert("RGB"), dtype=np.float64) / 255.0
+    grey = rgb2gray(rgb)
+    blur_var = float(np.var(cv2.Laplacian(grey * 255.0, cv2.CV_64F, ksize=1)))
+    glare_fraction = float(np.mean(grey >= GLARE_THRESHOLD)) if grey.size else 0.0
+    return QualityMetrics(blur_var=max(0.0, blur_var), glare_fraction=min(1.0, glare_fraction))

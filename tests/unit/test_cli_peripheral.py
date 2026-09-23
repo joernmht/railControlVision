@@ -13,7 +13,7 @@ from typing import Any
 import yaml
 from typer.testing import CliRunner
 
-from rail_vision_bench.cli import EXIT_NOT_IMPLEMENTED, EXIT_OK, EXIT_USAGE, app
+from rail_vision_bench.cli import EXIT_INVALID, EXIT_NOT_IMPLEMENTED, EXIT_OK, EXIT_USAGE, app
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> Path:
@@ -43,13 +43,24 @@ def _run_config(tmp_path: Path) -> Path:
     )
 
 
-def test_synth_generate_is_not_implemented(cli: CliRunner, tmp_path: Path):
+def test_synth_generate_writes_a_dataset(cli: CliRunner, tmp_path: Path):
+    from rail_vision_bench.dataset.manifest import read_manifest
+
     out = tmp_path / "synthetic"
-    result = cli.invoke(app, ["synth", "generate", "--out", str(out), "--n", "3", "--seed", "1"])
-    assert result.exit_code == EXIT_NOT_IMPLEMENTED, result.output
-    assert "[not implemented]" in result.output
-    assert "generate_dataset" in result.output
-    assert not out.exists(), "a stub must not leave files behind"
+    result = cli.invoke(app, ["synth", "generate", "--out", str(out), "--n", "2", "--seed", "1"])
+    assert result.exit_code == EXIT_OK, result.output
+    rows = read_manifest(out / "manifest.jsonl")
+    assert len(rows) == 2
+    assert all(row.split == "synthetic_clean" for row in rows)
+    assert len(list((out / "images").glob("*.png"))) == 2
+    assert len(list((out / "gt").glob("*.json"))) == 2
+
+
+def test_synth_generate_unknown_preset(cli: CliRunner, tmp_path: Path):
+    out = tmp_path / "synthetic"
+    result = cli.invoke(app, ["synth", "generate", "--out", str(out), "--augment", "ghost"])
+    assert result.exit_code == EXIT_INVALID, result.output
+    assert "ghost" in result.output
 
 
 def test_synth_generate_requires_out(cli: CliRunner):

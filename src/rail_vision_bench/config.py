@@ -108,9 +108,10 @@ class TaskConfig(BaseModel):
 class RunConfig(BaseModel):
     """One benchmark run (``bench run --config``).
 
-    ``task`` and ``catalogue`` are file paths interpreted relative to the current
-    working directory at resolution time; a copy of the resolved configuration is
-    written into the run directory.
+    ``task``, ``catalogue`` and ``manifest`` are file paths interpreted relative to
+    the current working directory; a copy of the resolved configuration is written
+    into the run directory. The manifest is only read when the run executes, so a
+    dry run resolves without any data present.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -118,6 +119,10 @@ class RunConfig(BaseModel):
     name: str
     task: Path
     catalogue: Path = Path("configs/models.yaml")
+    manifest: Path = Field(
+        default=Path("data/manifest.jsonl"),
+        description="Dataset manifest; the run uses its rows whose split is the task's split.",
+    )
     models: list[str] = Field(min_length=1)
     mode: Mode = Mode.SINGLE_SHOT
     limit: int | None = None

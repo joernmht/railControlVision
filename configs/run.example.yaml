@@ -4,6 +4,8 @@
 name: smoke
 task: configs/tasks/panel_topology.yaml
 catalogue: configs/models.yaml
+# written by `make synth` (bench synth generate --out data/synthetic); read only when the run executes
+manifest: data/synthetic/manifest.jsonl
 models:
   - claude-opus-5
 mode: single_shot

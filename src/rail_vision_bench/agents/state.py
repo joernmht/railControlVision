@@ -1,16 +1,17 @@
 """State shared by the nodes of the agentic loop.
 
 The state is a ``total=False`` TypedDict: a caller seeds ``scene_id``,
-``image`` and the round budget, every node adds the keys it owns, and the
-critic decides whether another round runs. The prompt of each node documents
-which keys it reads and writes.
+``image``, ``model`` and the round budget (optionally ``source``), every node
+adds the keys it owns, and the critic decides whether another round runs. The
+prompt of each node documents which keys it reads and writes; ``usage`` and
+``errors`` are bookkeeping every node appends to.
 """
 
 from __future__ import annotations
 
 from typing import Any, Final, Literal, TypedDict
 
-from rail_vision_bench.providers.base import ImageInput
+from rail_vision_bench.providers.base import ImageInput, Usage
 
 NodeName = Literal["planner", "reader", "interpreter", "geometer", "builder", "critic"]
 
@@ -30,7 +31,10 @@ class AgentState(TypedDict, total=False):
 
     scene_id: str
     image: ImageInput
+    model: str
+    source: dict[str, Any]
     plan: list[str]
+    regions: list[dict[str, Any]]
     crops: list[dict[str, Any]]
     readings: list[dict[str, Any]]
     interpretation: dict[str, Any]
@@ -41,3 +45,5 @@ class AgentState(TypedDict, total=False):
     round: int
     max_rounds: int
     done: bool
+    usage: Usage
+    errors: list[str]

@@ -127,7 +127,9 @@ class HarnessClient:
             The inference result.
 
         Raises:
-            HarnessError: On a non-2xx answer (501 in the skeleton).
+            HarnessError: On a non-2xx answer: 404 for an unknown model, 422 for an
+                undecodable frame or invalid mode, 502 when the provider call fails,
+                503 when the catalogue or provider is unavailable.
         """
         response = await self._client.post(
             "/frame",

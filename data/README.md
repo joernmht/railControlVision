@@ -76,14 +76,60 @@ defaults of `DifficultyThresholds`: `hard` when `blur_var < 100` or `glare_fract
 `medium` when `blur_var < 300` or `glare_fraction > 0.05`, else `easy`. The thresholds are a
 model, so a split can carry its own.
 
+## Synthetic data
+
+`bench synth generate --out DIR [--n N] [--seed S] [--augment PRESET]`
+(`synth.generate.generate_dataset`; `make synth` runs it with `--out data/synthetic --n 10
+--seed 0`) writes
+
+```
+DIR/
+├── images/<scene_id>.png      rendered panel (augmented when --augment is given)
+├── gt/<scene_id>.json         strict-valid SceneAnnotation with exact pixel geometry
+└── manifest.jsonl             one ManifestRow per scene
+```
+
+Scene ids are `synth-<seed>-<index:05d>`, with `-<preset>` appended when augmented. Rows use
+split `synthetic_clean` (no `--augment`) or `synthetic_aug`, the hashed partition, the
+difficulty tier of the quality measured on the final image, `license: null` and paths relative
+to the working directory when `DIR` lies below it (absolute otherwise). Augmentation presets
+(`synth.augment.PRESETS`): `default` (mild perspective, lighting, glare, occlusion, motion blur,
+JPEG), `phone` (hand-held photo: stronger perspective, rotation, glare, occlusion) and `cctv`
+(control-room camera: downscaling, sensor noise, heavy compression). Every ground-truth
+coordinate goes through the same warp as the image, so augmented ground truth stays exact; an
+unknown preset exits with code 1. Equal arguments produce byte-identical files.
+
 ## Publishing on the Hugging Face Hub
 
-`rail_vision_bench.dataset.hub.push_split(split, repo_id, manifest=...)` and
-`pull_split(split, repo_id, dest=...)` are the intended interface (stubs in the skeleton). They
-will build a `datasets.Dataset` from the manifest rows (image column plus the ground-truth JSON
-as a string column), push it under the split name with the token from `HF_TOKEN`, and rebuild a
-local manifest on download. DVC stays the system of record; the Hub is a distribution channel
-for released splits only.
+DVC stays the system of record; the Hub is a distribution channel for released splits only.
+`rail_vision_bench.dataset.hub` stores each split in its own folder of one Hub *dataset*
+repository, so several splits share a repository and a download fetches exactly one:
+
+```
+<split>/manifest.jsonl         ManifestRow per scene, paths relative to the repository root
+<split>/images/<scene_id>.<ext>
+<split>/gt/<scene_id>.json     strict-valid SceneAnnotation
+```
+
+- `push_split(split, repo_id, *, manifest, root=Path(), settings=None, private=True)` first
+  runs `check_release`: the manifest is not empty, every row belongs to `split`, scene ids are
+  unique, every non-synthetic row fills `license`, image and ground-truth files exist, and every
+  ground truth parses, carries the row's `scene_id`, `width` and `height` and is strict-valid.
+  Any failure raises `HubReleaseError` listing every problem, and nothing is uploaded. Otherwise
+  the files are staged under the layout above (renamed to `<scene_id>`, manifest paths
+  rewritten), the dataset repository is created when missing (private by default) and the
+  folder is uploaded to `<split>/` in one commit with `HfApi.upload_folder`; files of an earlier
+  upload of the split that are no longer staged are deleted in that commit. Returns the commit
+  URL.
+- `pull_split(split, repo_id, *, dest, revision=None, settings=None)` fetches only
+  `<split>/**` with `snapshot_download` into `dest`, checks that every file the downloaded
+  manifest names is present, re-anchors `image` and `gt` at `dest` and writes
+  `dest/manifest.jsonl`. With a relative `dest` (for example `data/hub`) the paths stay
+  repository-relative. Returns the manifest path.
+
+A split name must be one safe path segment (`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`). The token is
+`HF_TOKEN` (`settings.hf_token`), falling back to the `huggingface_hub` login when unset. There
+is no `bench` command for the Hub; call the functions from Python.
 
 ## PII, consent and licensing policy
 

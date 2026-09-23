@@ -25,7 +25,7 @@ Targets you will use daily:
 | `lock` / `lock-check` | regenerate `requirements.lock` in place / fail if it drifted |
 | `build-check` | `uv build` and verify dynamic deps and package data landed in the wheel |
 | `pre-commit` | every hook on the whole tree |
-| `serve`, `synth`, `compose-up`, `compose-down`, `clean` | harness with reload, synthetic data (exits 3 in the skeleton), Docker services, cache cleanup |
+| `serve`, `synth`, `compose-up`, `compose-down`, `clean` | harness with reload, 10 synthetic scenes into `data/synthetic` (`--seed 0`), Docker services, cache cleanup |
 
 `make test VENV=/path/to/venv311` runs any target against another venv; CI runs the whole set
 on Python 3.11 and 3.12.
@@ -57,8 +57,9 @@ schema is built in memory); the committed file is the published contract.
 
 ## Stub policy
 
-A stub is a function or method whose body is exactly a Google docstring (stating the intended
-implementation) followed by
+The package currently has no stubs. The policy stays for any stub added later (for example a
+new provider or tool landed in two steps): a stub is a function or method whose body is exactly
+a Google docstring (stating the intended implementation) followed by
 
 ```python
 raise NotImplementedError(
@@ -66,11 +67,17 @@ raise NotImplementedError(
 )
 ```
 
-Rules: a stub never imports the SDK it will use (this keeps `bench --help` fast and the mypy
-override list empty), never contains `yield` (an iterator stub is a plain function that
-raises), and every stub is listed in `tests/unit/test_stubs.py`, which asserts the exception and
-a non-empty docstring. The CLI maps `NotImplementedError` to exit code 3 so a stub is never
-mistaken for success. Nothing may return a placeholder value that looks like a result.
+The message prefix is fixed by `tests/unit/test_stubs.py`. Rules: a stub never imports the SDK
+it will use (this keeps `bench --help` fast and the mypy override list empty) and never contains
+`yield` (an iterator stub is a plain function that raises). Stubs are not listed anywhere:
+`tests/unit/test_stubs.py` discovers them by parsing every module with `ast`, calls each one and
+asserts the exception, the message and a non-empty docstring; it also fails when a
+`raise NotImplementedError` sits in a function that is not stub-shaped, so a stub is
+all-or-nothing. The CLI does not catch `NotImplementedError` (there is no dedicated exit code):
+a stub reached from `bench` ends the command with a traceback and a non-zero exit, except inside
+a `bench run` attempt, where it is recorded like any other exception as that prediction's
+`parse_error`. Either way it never passes for a success. Nothing may return a placeholder value
+that looks like a result.
 
 ## Tooling rules and why they exist
 
@@ -82,25 +89,29 @@ mistaken for success. Nothing may return a placeholder value that looks like a r
   stay at module level.
 - **No `python_version` in the mypy config.** numpy on 3.12 (the lock installs different
   numpy versions per interpreter) ships PEP 695 `type` statements in its stubs, and forcing
-  `python_version = "3.11"` makes mypy fail inside `numpy/__init__.pyi` even though our code
-  never imports numpy (the networkx stubs do). Each CI leg type-checks with its own interpreter.
+  `python_version = "3.11"` makes mypy fail inside `numpy/__init__.pyi`, which it reaches
+  through the networkx stubs and the modules that import numpy. Each CI leg type-checks with
+  its own interpreter.
 - **Typeshed stubs live in `[dependency-groups] typing`** (`types-PyYAML`, `types-jsonschema`,
   `types-networkx`) and are installed with `uv pip install --group typing`. They are dev-only:
   setuptools ignores dependency groups, so they are neither in the wheel nor in the lock. To
   bump one, edit the pin in `pyproject.toml`, reinstall the group, run `make typecheck`.
-- **No `ignore_missing_imports` overrides exist**, and none may be added. Implemented modules
-  import only typed libraries or ones with installed stubs. Libraries without types in the lock
+- **No `ignore_missing_imports` overrides exist**, and none may be added. Modules import typed
+  libraries or ones with installed stubs at module level. Libraries without types in the lock
   (pandas, scipy, scikit-learn, pyarrow, shapely, svgwrite, cairosvg, albumentations,
-  datasets, tabulate, dvc, tqdm, mistralai) are imported inside function bodies of the code
-  that uses them, never at module level, and their objects are typed as `Any` or replaced by
-  `Path`/`str` contracts in signatures. Third-party types for annotations only are allowed
-  under `if TYPE_CHECKING:` for libraries that ship `py.typed` (PIL, httpx, langgraph, fastapi,
-  prometheus_client, starlette).
+  datasets, tabulate, dvc, tqdm) are imported inside function bodies of the code that uses
+  them, never at module level, each with a line-local `# type: ignore[import-untyped]`, and
+  their objects are typed as `Any` or replaced by `Path`/`str` contracts in signatures. Provider
+  modules import their SDK at module level; the registry imports a provider module only inside
+  its factory, so `bench --help` never loads an SDK. Third-party types for annotations only
+  are allowed under `if TYPE_CHECKING:` for libraries that ship `py.typed` (PIL, httpx,
+  langgraph, fastapi, prometheus_client, starlette).
 - **ruff rule choices.** Selected: E, W, F, I, UP, B, A, C4, SIM, PIE, PT, RET, RUF, ANN, D, N,
   TID, PTH, ERA, T20, PLE, PLW, LOG, G, FAST, ASYNC, PERF; Google docstrings; line length 100;
   `tests/**` is exempt from D and ANN. Deliberately **not** selected: TC and FA (they would
-  move imports under `TYPE_CHECKING` and break runtime annotation resolution), ARG (stubs have
-  unused parameters by design), PD/NPY (no pandas or numpy in implemented code), PLC (lazy
+  move imports under `TYPE_CHECKING` and break runtime annotation resolution), ARG (protocol
+  and callback signatures, and any future stub, have unused parameters by design), PD/NPY
+  (pandas and numpy are confined to a few modules of `eval`, `ingest` and `synth`), PLC (lazy
   imports inside command bodies need no `noqa`). `flake8-builtins` runs with
   `strict-checking = true`, so a module or subpackage may not shadow a stdlib name.
 - **Naming guard.** Because of the rule above, subpackages are named `ingest`, `dataset`,
@@ -155,14 +166,19 @@ hatch when mypy already ran; CI uses the same `SKIP=mypy` after its own typechec
   (`name: ClassVar[str] = "<key>"`, `__init__(self, settings)`, `async complete(request)`),
   a lazy factory in `providers/registry.py`, the key in `config.ProviderName` and
   `PROVIDER_NAMES`, a catalogue entry in `configs/models.yaml`, and the tests in
-  `tests/unit/test_providers.py` (the registry must resolve every name) and
-  `tests/unit/test_stubs.py` while it is a stub.
+  `tests/unit/test_providers.py` (the registry must resolve every name), plus a
+  `complete()` test against the SDK over a mocked transport in `tests/unit/test_provider_impls.py`
+  (no network call in tests).
 - **A metric:** add the name to `eval/metrics.METRIC_NAMES`, a function returning
-  `list[MetricResult]`, its call in the (future) `eval/aggregate.py`, a column in
-  `report/templates/leaderboard.html.j2` if it should be on the leaderboard, and document it
-  in `docs/architecture.md`.
+  `list[MetricResult]` with the raw counts in `extra`, its call in
+  `eval/scoring.score_prediction` (per scene) or `eval/metrics.latency_summary` plus
+  `RUN_LEVEL_METRICS` (run level), its micro-average in `eval/aggregate.combine_results`, its row
+  in the `eval/metrics.py` module docstring table and the name list in `docs/architecture.md`,
+  and a name token in `report/render.LOWER_IS_BETTER_TOKENS` if lower is better (the leaderboard
+  shows every metric it receives).
 - **A tool:** add the callable to `tools/tools.py`, its name to `TOOL_NAMES`, register it in
-  `tools/mcp_server.py` once that exists, and give the agent prompts a sentence on when to use it.
+  `tools/mcp_server.build_mcp_server` and `agents/deep.build_tools`, and give the agent prompts a
+  sentence on when to use it.
 - **A task:** add `configs/tasks/<name>.yaml` (`TaskConfig` fields: `name`, `description`,
   `source_kind`, `split`, `prompt`, `metrics` from `METRIC_NAMES`), make sure the split exists
   in the manifest, and reference it from a run config.
@@ -186,6 +202,7 @@ the wheel carries the dynamic requirements, `py.typed`, the prompts and the repo
 
 Use the checklist in `.github/pull_request_template.md`: lock regenerated when
 `requirements.txt` changed, schema regenerated when the models changed, `make check` green on
-both interpreters, new stubs raise and are listed, no fabricated results. The project is
+both interpreters, any new stub raises with the documented message (discovered by
+`tests/unit/test_stubs.py`), no fabricated results. The project is
 licensed under Apache-2.0 (`LICENSE`, `NOTICE`); contributions are accepted under the same
 license (Apache-2.0 §5), and new third-party code must come with a compatible license.

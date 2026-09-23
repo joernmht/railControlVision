@@ -78,7 +78,7 @@ build-check:  ## build the wheel and verify dynamic deps + package data landed i
 serve:  ## run the real-time harness with reload
 	$(BIN)/bench serve --reload
 
-synth:  ## generate synthetic data (exits 3 in the skeleton)
+synth:  ## generate 10 synthetic scenes into data/synthetic
 	$(BIN)/bench synth generate --out data/synthetic --n 10 --seed 0
 
 compose-up:  ## start n8n + MLflow

@@ -9,26 +9,29 @@ that aim; this file paraphrases it.
 
 Python package `rail_vision_bench`, command line `bench`, Python 3.11 or 3.12.
 
-## Status: skeleton
+## Status
 
-This is the first commit: a coherent, installable, lint/type/test-clean **skeleton**. Every
-benchmark stage that would need a model call, an image pipeline or a metric computation is an
-honest stub that raises `NotImplementedError` with a one-line statement of intent; nothing
-fakes a result. What actually works today:
+The full pipeline is implemented: `bench run` → `bench eval` → `bench report`, the six
+providers, the single-shot baseline, the six-node agentic loop and the deep-agent variant, the
+four tools and their MCP server, ingest (image, video/RTSP, screen, preprocessing, quality),
+synthetic rendering and augmentation, harness inference (`POST /frame`, `WS /stream`), the
+MLflow tracker, Hub push/pull and leaderboard rendering. The package contains no
+`NotImplementedError` stub.
 
-| Implemented | Stubbed (raises `NotImplementedError`, CLI exit code 3) |
+What the test suite does **not** exercise against live services:
+
+| Area | How it is tested |
 | --- | --- |
-| Schema v0: pydantic models, JSON Schema export (`schema/v0.json`), drift check | Provider `complete()` for all six backends |
-| Semantic validator (graph rules, state rules, route walker, strict mode) | Agent nodes (planner … critic), single-shot runner, deep-agent variant |
-| Valid-by-construction topology/scene generator used by the property tests | `crop`/`read`/`render` tools and the MCP server (`validate` tool is real) |
-| `bench validate`, `bench schema export`, `bench run --dry-run` | `bench run` (without `--dry-run`), `bench eval`, `bench report`, `bench synth generate` |
-| Harness: `GET /health`, `GET /metrics`, `POST /validate`; `HarnessClient` | Harness inference: `POST /frame` answers 501, `WS /stream` closes with 1011 |
-| Configs (run / task / model catalogue), settings, run-directory contract | Ingest (image, video, screen, preprocessing, quality), synthetic rendering and augmentation |
-| Manifest JSONL, deterministic dev/test partition, difficulty tiers | Element matching, every metric, parquet aggregation, MLflow tracker, Hub push/pull, report rendering |
-| LangGraph wiring of the six-node loop with the critic → planner edge | |
+| Provider `complete()` (all six) | Real SDK clients over mocked transports (`httpx.MockTransport`; `litellm.acompletion` replaced). No real API call is made in CI: the wire payloads are checked, model behaviour is not. |
+| Agents, runner, harness inference, MCP `read` | Fake providers with canned answers. |
+| Video | A small generated file; no RTSP stream. |
+| Screen capture | `mss` is faked; the one real capture test is marked `requires_display` and skipped without `DISPLAY`. |
+| Hugging Face Hub | `HfApi` / `snapshot_download` replaced by in-process fakes; nothing is uploaded or downloaded. |
+| MLflow tracker | A local `sqlite:///` tracking store, not the compose server. |
 
-`tests/unit/test_stubs.py` enumerates every stub and asserts it raises with a non-empty docstring,
-so a stub cannot quietly become a fake.
+`tests/unit/test_stubs.py` stays as a guard: it discovers every stub-shaped function by parsing
+the package and asserts that it raises `NotImplementedError` with a docstring and a message
+naming its intent. It currently finds none; a stub added later is covered automatically.
 
 ## Quickstart
 
@@ -51,6 +54,21 @@ bench run --config configs/run.example.yaml --dry-run
 make compose-up                        # n8n on :5678 and MLflow on :5000 (needs Docker)
 ```
 
+End to end on synthetic data:
+
+```sh
+make synth                             # bench synth generate --out data/synthetic --n 10 --seed 0
+bench run --config configs/run.example.yaml        # prints "run written to runs/<run_id>"
+bench eval runs/<run_id>               # metrics.parquet + summary.json
+bench report runs/<run_id>             # reports/leaderboard.html + runs/<run_id>/report.html
+```
+
+`configs/run.example.yaml` reads `manifest: data/synthetic/manifest.jsonl` (split
+`synthetic_clean`, the split of `configs/tasks/panel_topology.yaml`) and runs the catalogue
+entry `claude-opus-5`, so `bench run` needs `ANTHROPIC_API_KEY` in the environment or `.env`
+(without it the run still completes, but every record's `parse_error` names the missing key).
+Pick another catalogue model with `--model NAME`.
+
 ## Repository layout
 
 | Path | What lives there |
@@ -64,17 +82,22 @@ make compose-up                        # n8n on :5678 and MLflow on :5000 (needs
 | `src/rail_vision_bench/` | The package (src layout). Subpackages below. |
 | `src/rail_vision_bench/schema/` | Schema v0 models, issue codes, JSON Schema export and jsonschema wrapper. |
 | `src/rail_vision_bench/graph/` | Rules tables, networkx build, semantic validator, deterministic generator. |
-| `src/rail_vision_bench/providers/` | `VisionProvider` protocol, request/response models, registry, six provider stubs. |
-| `src/rail_vision_bench/agents/` | LangGraph state, node stubs, graph wiring, single-shot and deep-agent stubs, prompt loader. |
+| `src/rail_vision_bench/providers/` | `VisionProvider` protocol, request/response models, lazy registry, the six SDK-backed providers. |
+| `src/rail_vision_bench/providers/parsing.py` | `extract_json`: recovers the JSON object from fenced or prose-wrapped model text (used by every provider and agent node). |
+| `src/rail_vision_bench/providers/_common.py` | Shared provider helpers: image encoding, credential checks, tenacity retry on transient errors, schema instructions. |
+| `src/rail_vision_bench/agents/` | LangGraph state, the six async nodes and router, graph wiring and `run_agentic`, single-shot baseline, deep-agent variant, prompt loader. |
+| `src/rail_vision_bench/agents/documents.py` | Scene ids from image bytes, default `source`, `stamp_document` (code-owned bookkeeping fields), non-raising parse, usage sums. |
+| `src/rail_vision_bench/agents/assembly.py` | `assemble_candidate`: deterministic schema-v0 draft from the interpreter's and geometer's output. |
 | `src/rail_vision_bench/prompts/` | Versioned prompts shipped as package data (`single_shot.md`, `agentic/*.md`). |
-| `src/rail_vision_bench/tools/` | The four agent tools (`validate` real) and the MCP server stub. |
+| `src/rail_vision_bench/tools/` | The four agent tools (`crop`, `read`, `validate`, `render`) and the FastMCP server. |
 | `src/rail_vision_bench/ingest/` | Image/video/screen ingestion, preprocessing and quality metrics (named `ingest`, not `io`). |
-| `src/rail_vision_bench/synth/` | Synthetic dataset generation, SVG rendering and augmentation stubs. |
-| `src/rail_vision_bench/eval/` | Prediction/metric row models, matching, metric names and stubs, aggregation stub. |
-| `src/rail_vision_bench/harness/` | FastAPI real-time harness, Prometheus registry, wire models, async client. |
-| `src/rail_vision_bench/dataset/` | Manifest JSONL, dev/test partition, difficulty tiers, Hub stubs (named `dataset`, not `data`). |
-| `src/rail_vision_bench/tracking/` | Tracker protocol, `NullTracker`, MLflow tracker stub. |
-| `src/rail_vision_bench/report/` | Leaderboard template (package data) and render stub. |
+| `src/rail_vision_bench/synth/` | Synthetic dataset generation, tile layout and SVG/PNG rendering, albumentations presets. |
+| `src/rail_vision_bench/eval/` | Prediction/metric row models, Hungarian matching, metrics, parquet aggregation. |
+| `src/rail_vision_bench/eval/scoring.py` | `score_prediction`: matches one prediction to its ground truth and runs the per-scene metrics. |
+| `src/rail_vision_bench/harness/` | FastAPI real-time harness (validate, frame, stream), Prometheus registry, wire models, async client. |
+| `src/rail_vision_bench/dataset/` | Manifest JSONL, dev/test partition, difficulty tiers, Hub push/pull (named `dataset`, not `data`). |
+| `src/rail_vision_bench/tracking/` | Tracker protocol, `NullTracker`, `MlflowTracker`. |
+| `src/rail_vision_bench/report/` | Leaderboard template (package data) and HTML/Markdown rendering. |
 | `schema/v0.json`, `schema/examples/v0/` | The published JSON Schema and two strict-valid example documents. |
 | `configs/` | `run.example.yaml`, `models.yaml` (catalogue), `tasks/panel_topology.yaml`. |
 | `data/` | DVC data plane; only `manifest.example.jsonl` and `README.md` are committed. |
@@ -85,19 +108,25 @@ make compose-up                        # n8n on :5678 and MLflow on :5000 (needs
 
 ## Command line
 
-`bench` exits with **0** on success, **1** on validation errors, schema drift or a bad config
-reference, **2** on a usage error (typer) and **3** when a command reaches a skeleton stub.
+`bench` exits with **0** on success, **1** on validation errors, schema drift or a bad config,
+manifest or run directory (this includes runtime errors such as a missing manifest or image, an
+existing run directory, an unevaluated run passed to `bench report` or an unknown augmentation
+preset) and **2** on a usage error (typer, including a path argument that does not exist).
 
-| Command | Purpose | Status | Exit codes |
-| --- | --- | --- | --- |
-| `bench --version` | Print the package version. | implemented | 0 |
-| `bench validate FILES... [--strict] [--schema PATH] [--json]` | Validate documents against schema v0 and the semantic rules; table or one JSON object `{file: report}`. | implemented | 0 / 1 / 2 |
-| `bench schema export [--out PATH] [--check]` | Write `schema/v0.json` from the models, or check the committed file for drift. | implemented | 0 / 1 / 2 |
-| `bench run --config PATH [--model NAME]... [--mode] [--limit] [--seed] [--out] [--dry-run]` | Resolve a run config (task file, catalogue, model names) and, without `--dry-run`, execute it. | `--dry-run` implemented; execution stubbed | 0 / 1 / 2 / 3 |
-| `bench eval RUN_DIR` | Score a run into `metrics.parquet` and `summary.json`. | stubbed | 2 / 3 |
-| `bench report RUN_DIRS... [--out PATH]` | Render a leaderboard (default `reports/leaderboard.html`). | stubbed | 2 / 3 |
-| `bench synth generate --out DIR [--n] [--seed] [--augment]` | Generate synthetic panels with ground truth and a manifest. | stubbed | 2 / 3 |
-| `bench serve [--host] [--port] [--reload]` | Serve the harness (defaults from `RVB_HARNESS_HOST` / `RVB_HARNESS_PORT`). | implemented for the live endpoints | 0 / 2 |
+| Command | Purpose | Exit codes |
+| --- | --- | --- |
+| `bench --version` | Print the package version. | 0 |
+| `bench validate FILES... [--strict] [--schema PATH] [--json]` | Validate documents against schema v0 and the semantic rules; table or one JSON object `{file: report}`. | 0 / 1 / 2 |
+| `bench schema export [--out PATH] [--check]` | Write `schema/v0.json` from the models, or check the committed file for drift. | 0 / 1 / 2 |
+| `bench run --config PATH [--model NAME]... [--mode] [--limit] [--seed] [--out] [--dry-run]` | Resolve a run config (task file, catalogue, model names) and, without `--dry-run`, execute it into `<out_dir>/<run_id>/`. | 0 / 1 / 2 |
+| `bench eval RUN_DIR` | Score a run into `metrics.parquet` and `summary.json`. | 0 / 1 / 2 |
+| `bench report RUN_DIRS... [--out PATH]` | Render a leaderboard of evaluated runs to `--out` (default `reports/leaderboard.html`; Markdown when the path ends in `.md`, else HTML) and write each run directory's `report.html`. | 0 / 1 / 2 |
+| `bench synth generate --out DIR [--n] [--seed] [--augment PRESET]` | Generate synthetic panels with ground truth and a manifest; `--augment` takes `default`, `phone` or `cctv`. | 0 / 1 / 2 |
+| `bench serve [--host] [--port] [--reload]` | Serve the harness (defaults from `RVB_HARNESS_HOST` / `RVB_HARNESS_PORT`). | 0 / 2 |
+| `bench mcp [--transport stdio\|sse] [--host] [--port] [--provider NAME] [--model ID]` | Serve `crop`, `read`, `validate`, `render` over MCP (SSE default bind `127.0.0.1:8765`); `read` needs `--provider` (registry name, e.g. `anthropic`) and `--model` (SDK model id). | 0 / 2 |
+
+A failed provider call does not abort `bench run`: it is recorded as that attempt's
+`parse_error` in `predictions.jsonl`.
 
 `--strict` promotes `STATE_MISSING`, `GEOM_OUT_OF_BOUNDS` and `ROUTE_SWITCH_MISSING` from
 warnings to errors; CI validates the examples in strict mode.
@@ -110,9 +139,11 @@ warnings to errors; CI validates the examples in strict mode.
   German glossary, ports and degrees, DKW/EKW path families, state vocabularies, the route
   walker, every issue code, strict mode and the versioning policy.
 - [`docs/architecture.md`](docs/architecture.md) — pipeline, module map, run-directory contract,
-  harness wire protocol, MCP/n8n integration, configuration lifecycle, reproducibility inputs.
+  metrics table, harness wire protocol, MCP/n8n integration, configuration lifecycle,
+  reproducibility inputs and how each part is tested.
 - [`data/README.md`](data/README.md) — the DVC data plane, the manifest contract, splits,
-  partitions, difficulty tiers and the PII/consent/licensing policy.
+  partitions, difficulty tiers, synthetic generation, Hub publishing and the
+  PII/consent/licensing policy.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — developer workflow and the tooling rules that keep the
   tree green.
 
@@ -144,8 +175,11 @@ accidental upload to PyPI impossible.
 
 - **n8n** (orchestration UI) and an **MLflow tracking server**: `make compose-up` starts
   `docker/compose.yaml` (n8n on http://localhost:5678, MLflow on http://localhost:5000);
-  `make compose-down` stops them. Point `MLFLOW_TRACKING_URI=http://localhost:5000` at the
-  server and set `tracker: mlflow` in a run config once the tracker is implemented.
+  `make compose-down` stops them. Set `tracker: mlflow` in a run config and point
+  `MLFLOW_TRACKING_URI` at the compose server (`http://localhost:5000`) or at a database store
+  such as `sqlite:///mlflow.db`. MLflow 3 refuses the file store (`./mlruns`, `file:` URIs)
+  unless `MLFLOW_ALLOW_FILE_STORE=true` is set; with the variable unset MLflow 3 defaults to
+  `sqlite:///mlflow.db` in the working directory.
 - **ffmpeg**: PyAV and OpenCV wheels bundle their own codecs, but RTSP/video work on a host is
   more robust with a system ffmpeg (`apt install ffmpeg`, `brew install ffmpeg`).
 - **libcairo** for `cairosvg` (SVG → PNG in the synthetic pipeline): `apt install libcairo2`

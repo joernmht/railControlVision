@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import pytest
 from pydantic import ValidationError
 
@@ -24,11 +27,28 @@ def test_get_provider_resolves_every_name(name: str):
     assert getattr(provider, "settings", None) is settings
 
 
+SDK_MODULES = ("anthropic", "openai", "google.genai", "mistralai", "ollama", "litellm")
+
+
+def test_registry_import_loads_no_sdk():
+    """The registry's factories import provider modules (and their SDKs) only when called."""
+    code = (
+        "import sys, rail_vision_bench.providers, rail_vision_bench.providers.registry\n"
+        f"loaded = [m for m in {SDK_MODULES!r} if m in sys.modules]\n"
+        "print(','.join(loaded))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True, timeout=120
+    )
+    assert result.stdout.strip() == ""
+
+
 @pytest.mark.parametrize("name", PROVIDER_NAMES)
-async def test_complete_is_a_stub(name: str):
+def test_provider_builds_without_credentials(name: str):
+    """Clients are created lazily, so a provider without keys can still be constructed."""
     provider = get_provider(name, Settings(_env_file=None))
-    with pytest.raises(NotImplementedError, match="not implemented in the skeleton"):
-        await provider.complete(VisionRequest(model="m", prompt="p"))
+    assert getattr(provider, "_client", None) is None
+    assert callable(provider.complete)
 
 
 def test_get_provider_defaults_to_get_settings():

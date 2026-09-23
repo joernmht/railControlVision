@@ -98,3 +98,21 @@ def test_image_input_rejects_gif():
 def test_models_forbid_extra_keys():
     with pytest.raises(ValidationError):
         VisionRequest.model_validate({"model": "m", "prompt": "p", "extra": 1})
+
+
+def test_catalogue_params_override_the_endpoint_settings():
+    from rail_vision_bench.config import ModelConfig
+    from rail_vision_bench.providers.registry import provider_for_model, settings_for_model
+
+    settings = Settings(_env_file=None, openai_base_url="http://env/v1")
+    local = ModelConfig(
+        name="local", provider="openai", model_id="m", params={"base_url": "http://vllm:8000/v1"}
+    )
+    hosted = ModelConfig(name="hosted", provider="openai", model_id="m", params={"base_url": None})
+    ollama = ModelConfig(name="o", provider="ollama", model_id="m", params={"host": "http://gpu:1"})
+    assert settings_for_model(local, settings).openai_base_url == "http://vllm:8000/v1"
+    assert settings_for_model(hosted, settings) is settings
+    assert settings_for_model(ollama, settings).ollama_host == "http://gpu:1"
+    assert settings.openai_base_url == "http://env/v1"  # the process settings are untouched
+    provider = provider_for_model(local, settings)
+    assert provider.settings.openai_base_url == "http://vllm:8000/v1"  # type: ignore[attr-defined]

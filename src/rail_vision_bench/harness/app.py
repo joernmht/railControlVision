@@ -34,7 +34,7 @@ from rail_vision_bench.harness.metrics import (
 )
 from rail_vision_bench.harness.models import FrameResponse, HealthResponse, ValidateResponse
 from rail_vision_bench.providers.base import ImageInput, Usage, VisionProvider
-from rail_vision_bench.providers.registry import get_provider
+from rail_vision_bench.providers.registry import provider_for_model
 from rail_vision_bench.schema.issues import IssueCode, ValidationReport
 from rail_vision_bench.schema.models import SceneAnnotation
 from rail_vision_bench.settings import Settings, get_settings
@@ -67,7 +67,7 @@ class FrameError(Exception):
 
 def _registry_provider(model: ModelConfig, settings: Settings) -> VisionProvider:
     """Default :data:`ProviderFactory`: the registry's provider for the entry."""
-    return get_provider(model.provider, settings)
+    return provider_for_model(model, settings)
 
 
 def image_input(data: bytes) -> ImageInput:
@@ -287,7 +287,7 @@ def create_app(
         catalogue_path: Catalogue file, default ``configs/models.yaml``
             relative to the working directory at the first inference request.
         provider_factory: Builds the provider of a catalogue entry; the
-            registry (``get_provider(entry.provider, settings)``) when omitted.
+            registry (``provider_for_model(entry, settings)``) when omitted.
         max_rounds: Round budget of agentic inference.
 
     Returns:

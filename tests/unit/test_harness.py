@@ -254,7 +254,7 @@ def test_frame_catalogue_loaded_lazily(tmp_path: Path, monkeypatch: pytest.Monke
 
 def test_default_catalogue_and_registry(monkeypatch: pytest.MonkeyPatch):
     provider = DocumentProvider()
-    monkeypatch.setattr(harness_app, "get_provider", lambda name, settings: provider)
+    monkeypatch.setattr(harness_app, "provider_for_model", lambda model, settings: provider)
     client = TestClient(create_app(Settings(_env_file=None)))
     response = client.post(
         "/frame", files={"frame": ("f.png", png(), "image/png")}, data={"model": "gpt-4o"}

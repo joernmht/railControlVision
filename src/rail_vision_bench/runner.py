@@ -136,9 +136,9 @@ def price(model: ModelConfig, usage: Usage) -> float | None:
 
 
 def _default_factory(model: ModelConfig, settings: Settings) -> VisionProvider:
-    from rail_vision_bench.providers.registry import get_provider
+    from rail_vision_bench.providers.registry import provider_for_model
 
-    return get_provider(model.provider, settings)
+    return provider_for_model(model, settings)
 
 
 def _image_input(path: Path) -> ImageInput:

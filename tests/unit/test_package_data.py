@@ -12,19 +12,7 @@ from rail_vision_bench.report.render import TEMPLATE_NAME, load_template
 
 AGENTIC_SECTIONS = ("## Reads", "## Writes", "## Instructions", "## Stop condition")
 SINGLE_SHOT_PLACEHOLDERS = ("{scene_id}", "{source_kind}", "{image}", "{width}", "{height}")
-LEADERBOARD_COLUMNS = (
-    "model",
-    "mode",
-    "split",
-    "headline_score",
-    "detection_f1",
-    "label_cer",
-    "state_accuracy",
-    "route_f1",
-    "ece",
-    "latency_p95_ms",
-    "cost_usd",
-)
+LEADERBOARD_COLUMNS = ("model", "mode", "split")
 
 
 @pytest.mark.parametrize("name", PROMPT_NAMES)

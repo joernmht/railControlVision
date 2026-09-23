@@ -1,51 +1,125 @@
 <!DOCTYPE html>
+{#- Leaderboard page; rendered by rail_vision_bench.report.render with autoescaping on.
+    Self-contained: inline CSS, no scripts, no external resources. -#}
+{%- set arrow = {"higher": "↑ higher is better", "lower": "↓ lower is better"} -%}
+{%- macro entry_cells(row) -%}
+<td class="text">{{ row.model }}</td><td class="text">{{ row.mode }}</td>
+{%- if show_run %}<td class="text">{{ row.run_id }}</td>{% endif -%}
+{%- if show_split %}<td class="text">{{ row.split }}</td>{% endif -%}
+{%- endmacro -%}
+{%- macro entry_headers() -%}
+<th class="text">model</th><th class="text">mode</th>
+{%- if show_run %}<th class="text">run</th>{% endif -%}
+{%- if show_split %}<th class="text">split</th>{% endif -%}
+{%- endmacro -%}
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }}</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; }
-    table { border-collapse: collapse; }
-    th, td { border: 1px solid #999; padding: 0.3rem 0.6rem; text-align: right; }
-    th:first-child, td:first-child, td:nth-child(2), td:nth-child(3) { text-align: left; }
+    :root {
+      --bg: #ffffff; --fg: #1d1f23; --muted: #5f6570; --line: #d5d8de;
+      --head: #f2f4f7; --best: #e3f4e8; --bar: #4c78a8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16181c; --fg: #e6e8eb; --muted: #9aa1ac; --line: #373b43;
+        --head: #22252b; --best: #1f3a2a; --bar: #6f9fd8;
+      }
+    }
+    body { background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif;
+           margin: 2rem auto; max-width: 72rem; padding: 0 1rem; line-height: 1.4; }
+    h1 { margin-bottom: 0.2rem; }
+    h2 { margin-top: 2.2rem; font-size: 1.2rem; }
+    h3 { margin: 1.6rem 0 0.4rem; font-size: 1rem; }
+    .meta, .scope, .direction { color: var(--muted); font-size: 0.9rem; font-weight: normal; }
+    .scroll { overflow-x: auto; }
+    table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { border: 1px solid var(--line); padding: 0.3rem 0.6rem; text-align: right;
+             white-space: nowrap; }
+    th { background: var(--head); vertical-align: bottom; }
+    th .scope, th .direction { display: block; }
+    .text { text-align: left; }
+    td.best { background: var(--best); font-weight: 600; }
+    .rank { color: var(--muted); font-size: 0.8rem; margin-left: 0.3rem; }
+    .bar { display: inline-block; height: 0.7rem; background: var(--bar); border-radius: 2px;
+           vertical-align: middle; }
+    td.barcell { width: 12rem; text-align: left; }
   </style>
 </head>
 <body>
   <h1>{{ title }}</h1>
-  <p>Generated at {{ generated_at }}</p>
+  <p class="meta">Generated at {{ generated_at }}</p>
+
+  <h2>Overview</h2>
+  {%- if rows %}
+  <p class="meta">One headline value per metric; entries ordered by mean rank over these columns.
+    Superscripts are ranks.</p>
+  <div class="scroll">
   <table>
     <thead>
       <tr>
-        <th>model</th>
-        <th>mode</th>
-        <th>split</th>
-        <th>headline_score</th>
-        <th>detection_f1</th>
-        <th>label_cer</th>
-        <th>state_accuracy</th>
-        <th>route_f1</th>
-        <th>ece</th>
-        <th>latency_p95_ms</th>
-        <th>cost_usd</th>
+        <th>#</th>{{ entry_headers() }}<th>mean rank</th>
+        {%- for column in overview.columns %}
+        <th>{{ column.name }}<span class="scope">{{ column.scope }}</span><span class="direction">{{ arrow[column.direction] }}</span></th>
+        {%- endfor %}
       </tr>
     </thead>
     <tbody>
       {% for row in rows %}
       <tr>
-        <td>{{ row.model }}</td>
-        <td>{{ row.mode }}</td>
-        <td>{{ row.split }}</td>
-        <td>{{ row.headline_score }}</td>
-        <td>{{ row.detection_f1 }}</td>
-        <td>{{ row.label_cer }}</td>
-        <td>{{ row.state_accuracy }}</td>
-        <td>{{ row.route_f1 }}</td>
-        <td>{{ row.ece }}</td>
-        <td>{{ row.latency_p95_ms }}</td>
-        <td>{{ row.cost_usd }}</td>
+        <td>{{ row.position }}</td>{{ entry_cells(row) }}<td>{{ row.mean_rank }}</td>
+        {%- for cell in row.cells %}
+        <td{% if cell.best %} class="best"{% endif %}>{{ cell.value }}{% if cell.rank is not none %}<sup class="rank">{{ cell.rank }}</sup>{% endif %}</td>
+        {%- endfor %}
       </tr>
-      {% endfor %}
+      {%- endfor %}
     </tbody>
   </table>
+  </div>
+  {%- else %}
+  <p>No metric rows.</p>
+  {%- endif %}
+
+  {%- if metrics %}
+  <h2>Per metric</h2>
+  {%- for table in metrics %}
+  <h3>{{ table.name }} <span class="scope">{{ table.scope }}</span> <span class="direction">{{ arrow[table.direction] }}</span></h3>
+  <div class="scroll">
+  <table>
+    <thead>
+      <tr><th>rank</th>{{ entry_headers() }}<th>value</th><th>n</th><th class="text">|value|</th></tr>
+    </thead>
+    <tbody>
+      {%- for row in table.rows %}
+      <tr>
+        <td>{{ row.rank if row.rank is not none else "—" }}</td>{{ entry_cells(row) }}
+        <td{% if row.rank == 1 %} class="best"{% endif %}>{{ row.value }}</td>
+        <td>{{ row.n }}</td>
+        <td class="barcell"><span class="bar" style="width: {{ row.bar }}%"></span></td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  </div>
+  {%- endfor %}
+  {%- endif %}
+
+  {%- if runs.rows %}
+  <h2>Runs</h2>
+  <div class="scroll">
+  <table>
+    <thead>
+      <tr>{% for column in runs.columns %}<th class="text">{{ column }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {%- for row in runs.rows %}
+      <tr>{% for cell in row %}<td class="text">{{ cell }}</td>{% endfor %}</tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  </div>
+  {%- endif %}
 </body>
 </html>

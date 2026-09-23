@@ -25,7 +25,7 @@ from rail_vision_bench.config import (
     load_yaml,
     resolve_run,
 )
-from rail_vision_bench.runner import RUN_LAYOUT, build_report, evaluate_run, run_benchmark, run_dir
+from rail_vision_bench.runner import RUN_LAYOUT, run_dir
 from rail_vision_bench.schema.models import SourceKind
 
 CATALOGUE: dict[str, Any] = {
@@ -193,13 +193,3 @@ def test_run_layout_and_run_dir():
     assert len(set(RUN_LAYOUT.values())) == len(RUN_LAYOUT)
     assert RUN_LAYOUT["config"] == "run.yaml"
     assert run_dir(Path("runs"), "2026-09-22-abc") == Path("runs") / "2026-09-22-abc"
-
-
-def test_runner_stubs_raise(tmp_path: Path):
-    with pytest.raises(NotImplementedError, match="run_benchmark"):
-        run_benchmark(_run_config())
-    with pytest.raises(NotImplementedError, match="evaluate_run"):
-        evaluate_run(tmp_path)
-    with pytest.raises(NotImplementedError, match="build_report"):
-        build_report([tmp_path], tmp_path / "report.html")
-    assert not (tmp_path / "report.html").exists()

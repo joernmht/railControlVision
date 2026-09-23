@@ -1,5 +1,8 @@
 """Every stub in the package raises NotImplementedError and carries a docstring.
 
+The skeleton's stubs have all been implemented, so discovery currently finds
+none; the guard stays so that any stub added later is held to the same rules.
+
 Stubs are discovered mechanically instead of being listed by hand: every module
 under ``rail_vision_bench`` is parsed with ``ast`` and a function or method
 whose body is exactly a docstring followed by one ``raise NotImplementedError(...)``
@@ -219,10 +222,32 @@ def _resolve(stub: StubRef) -> Any:
     return getattr(owner(*args, **kwargs), method_name)
 
 
-def test_discovery_is_non_empty_and_covers_known_stubs():
-    labels = {stub.label for stub in STUBS}
-    assert labels >= {"runner.run_benchmark", "providers.claude.AnthropicProvider.complete"}
-    assert len(labels) == len(STUBS)
+def _function(source: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
+    node = ast.parse(source).body[0]
+    assert isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    return node
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('def f():\n    """Doc."""\n    raise NotImplementedError("m")\n', True),
+        ('async def f():\n    """Doc."""\n    raise NotImplementedError("m")\n', True),
+        ('def f():\n    raise NotImplementedError("m")\n', False),  # no docstring
+        ('def f():\n    """Doc."""\n    raise NotImplementedError\n', False),  # no message
+        ('def f():\n    """Doc."""\n    x = 1\n    raise NotImplementedError("m")\n', False),
+        ('def f():\n    """Doc."""\n    return 1\n', False),
+    ],
+)
+def test_stub_shape_classifier(source: str, expected: bool):
+    """The classifier that polices stubs: exactly a docstring plus one messaged raise."""
+    assert _is_stub(_function(source)) is expected
+
+
+def test_discovered_stubs_are_unique():
+    """Every stub is found once. The finished package has none; a future stub is policed here."""
+    labels = [stub.label for stub in STUBS]
+    assert len(set(labels)) == len(labels)
 
 
 def test_every_not_implemented_raise_belongs_to_a_stub():

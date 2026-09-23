@@ -1,8 +1,8 @@
 """The ``bench`` command line.
 
-Exit codes: 0 ok, 1 validation errors / schema drift / bad config reference,
-2 usage error (typer), 3 not implemented in the skeleton. Heavy modules
-(validator, schema export, runner, harness, synth) are imported inside the
+Exit codes: 0 ok, 1 validation errors / schema drift / a bad config, manifest or
+run directory, 2 usage error (typer). Heavy modules
+(validator, schema export, runner, harness, synth, MCP) are imported inside the
 command bodies so that ``bench --help`` stays fast.
 """
 
@@ -33,7 +33,6 @@ app.add_typer(synth_app, name="synth")
 EXIT_OK = 0
 EXIT_INVALID = 1
 EXIT_USAGE = 2
-EXIT_NOT_IMPLEMENTED = 3
 
 console = Console()
 err_console = Console(stderr=True)
@@ -42,12 +41,6 @@ err_console = Console(stderr=True)
 # the help text shows the same default the Makefile uses.
 DEFAULT_SCHEMA_PATH = Path("schema/v0.json")
 DEFAULT_REPORT_PATH = Path("reports/leaderboard.html")
-
-
-def _not_implemented(exc: NotImplementedError) -> NoReturn:
-    """Report a skeleton stub on stderr and exit with ``EXIT_NOT_IMPLEMENTED``."""
-    err_console.print(f"[not implemented] {exc}", markup=False, highlight=False, soft_wrap=True)
-    raise typer.Exit(EXIT_NOT_IMPLEMENTED)
 
 
 def _fail(message: str) -> NoReturn:
@@ -233,8 +226,9 @@ def run(
         return
     try:
         written = runner.run_benchmark(run_config)
-    except NotImplementedError as exc:
-        _not_implemented(exc)
+    except (KeyError, OSError, ValueError) as exc:
+        # a missing manifest or image, an existing run directory, a bad manifest row
+        _fail(f"{config}: {_describe(exc)}")
     console.print(f"run written to {written}", highlight=False)
 
 
@@ -247,8 +241,8 @@ def eval_run(
 
     try:
         written = runner.evaluate_run(run_dir)
-    except NotImplementedError as exc:
-        _not_implemented(exc)
+    except (KeyError, OSError, ValueError) as exc:
+        _fail(f"{run_dir}: {_describe(exc)}")
     console.print(f"metrics written to {written}", highlight=False)
 
 
@@ -267,8 +261,8 @@ def report(
 
     try:
         written = runner.build_report(run_dirs, out)
-    except NotImplementedError as exc:
-        _not_implemented(exc)
+    except (KeyError, OSError, ValueError) as exc:
+        _fail(_describe(exc))
     console.print(f"report written to {written}", highlight=False)
 
 
@@ -327,3 +321,33 @@ def serve(
         )
         return
     uvicorn.run(create_app(settings), host=bind_host, port=bind_port, log_level=log_level)
+
+
+@app.command()
+def mcp(
+    transport: Annotated[
+        str, typer.Option("--transport", help="stdio (local agent hosts) or sse (n8n, remote).")
+    ] = "stdio",
+    host: Annotated[str, typer.Option("--host", help="Bind host for sse.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", help="Bind port for sse.")] = 8765,
+    provider: Annotated[
+        str | None,
+        typer.Option("--provider", help="Provider backing the read tool (e.g. anthropic)."),
+    ] = None,
+    model: Annotated[
+        str | None, typer.Option("--model", help="SDK model id backing the read tool.")
+    ] = None,
+) -> None:
+    """Serve the crop, read, validate and render tools over MCP."""
+    from rail_vision_bench.tools.mcp_server import serve_mcp
+
+    if transport not in ("stdio", "sse"):
+        err_console.print(f"--transport must be stdio or sse, not {transport!r}", markup=False)
+        raise typer.Exit(EXIT_USAGE)
+    serve_mcp(
+        host=host,
+        port=port,
+        transport="sse" if transport == "sse" else "stdio",
+        provider_name=provider,
+        model=model,
+    )

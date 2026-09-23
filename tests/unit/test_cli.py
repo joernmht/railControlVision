@@ -11,7 +11,7 @@ import yaml
 from typer.testing import CliRunner
 
 from rail_vision_bench import __version__
-from rail_vision_bench.cli import EXIT_INVALID, EXIT_NOT_IMPLEMENTED, EXIT_OK, EXIT_USAGE, app
+from rail_vision_bench.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, app
 from tests.conftest import EXAMPLES_DIR, FIXTURES_DIR, REPO_ROOT
 
 HELP_COMMANDS = [
@@ -255,22 +255,21 @@ def test_run_dry_run_invalid_config(cli: CliRunner, tmp_path: Path):
     assert result.exit_code == EXIT_INVALID
 
 
-def test_run_without_dry_run_is_not_implemented(cli: CliRunner, tmp_path: Path):
+def test_run_without_a_manifest_fails_before_writing(cli: CliRunner, tmp_path: Path):
     config = _run_setup(tmp_path)
     result = cli.invoke(app, ["run", "--config", str(config)])
-    assert result.exit_code == EXIT_NOT_IMPLEMENTED
-    assert "[not implemented]" in result.output
-    assert "run_benchmark" in result.output
+    assert result.exit_code == EXIT_INVALID, result.output
+    assert "manifest" in result.output
 
 
-def test_eval_is_not_implemented(cli: CliRunner, tmp_path: Path):
+def test_eval_of_a_directory_that_is_not_a_run(cli: CliRunner, tmp_path: Path):
     result = cli.invoke(app, ["eval", str(tmp_path)])
-    assert result.exit_code == EXIT_NOT_IMPLEMENTED
-    assert "evaluate_run" in result.output
+    assert result.exit_code == EXIT_INVALID
+    assert "run.yaml" in result.output
 
 
-def test_report_is_not_implemented(cli: CliRunner, tmp_path: Path):
+def test_report_of_an_unevaluated_run(cli: CliRunner, tmp_path: Path):
     result = cli.invoke(app, ["report", str(tmp_path), "--out", str(tmp_path / "lb.html")])
-    assert result.exit_code == EXIT_NOT_IMPLEMENTED
-    assert "build_report" in result.output
+    assert result.exit_code == EXIT_INVALID
+    assert "bench eval" in result.output
     assert not (tmp_path / "lb.html").exists()

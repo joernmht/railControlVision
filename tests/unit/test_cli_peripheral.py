@@ -1,4 +1,4 @@
-"""Peripheral CLI commands: synth generate (stub), serve --help and run without --dry-run.
+"""Peripheral CLI commands: synth generate, serve/mcp --help and run without --dry-run.
 
 These commands reach code outside the schema/validator core, so they live apart
 from test_cli.py; the configs are written into tmp_path so nothing here depends
@@ -13,7 +13,7 @@ from typing import Any
 import yaml
 from typer.testing import CliRunner
 
-from rail_vision_bench.cli import EXIT_INVALID, EXIT_NOT_IMPLEMENTED, EXIT_OK, EXIT_USAGE, app
+from rail_vision_bench.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, app
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> Path:
@@ -75,10 +75,21 @@ def test_serve_help(cli: CliRunner):
         assert option in result.output
 
 
-def test_run_without_dry_run_is_not_implemented(cli: CliRunner, tmp_path: Path):
+def test_mcp_help(cli: CliRunner):
+    result = cli.invoke(app, ["mcp", "--help"])
+    assert result.exit_code == EXIT_OK, result.output
+    for option in ("--transport", "--provider", "--model"):
+        assert option in result.output
+
+
+def test_mcp_rejects_an_unknown_transport(cli: CliRunner):
+    result = cli.invoke(app, ["mcp", "--transport", "carrier-pigeon"])
+    assert result.exit_code == EXIT_USAGE
+
+
+def test_run_without_a_manifest_writes_nothing(cli: CliRunner, tmp_path: Path):
     config = _run_config(tmp_path)
     result = cli.invoke(app, ["run", "--config", str(config)])
-    assert result.exit_code == EXIT_NOT_IMPLEMENTED, result.output
-    assert "[not implemented]" in result.output
-    assert "run_benchmark" in result.output
-    assert not (tmp_path / "runs").exists(), "the stub must not create the run directory"
+    assert result.exit_code == EXIT_INVALID, result.output
+    assert "manifest" in result.output
+    assert not (tmp_path / "runs").exists(), "a failed run must not create the run directory"

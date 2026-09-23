@@ -55,6 +55,7 @@ make compose-up                        # n8n on :5678 and MLflow on :5000 (needs
 
 | Path | What lives there |
 | --- | --- |
+| `LICENSE`, `NOTICE` | Apache-2.0 license text and the attribution notice. |
 | `requirements.txt` | The runtime dependency spec, committed verbatim; setuptools reads it as dynamic metadata. |
 | `requirements.lock` | Universal lock produced from `requirements.txt` (see below); what CI and `make install` install. |
 | `pyproject.toml` | Build (setuptools), extras, `bench` entry point, `[dependency-groups] typing`, ruff/mypy/pytest/coverage config. |
@@ -163,4 +164,10 @@ and a new literal, so documents can never silently cross versions. Details in
 
 ## License
 
-TODO: no license has been chosen yet; until one is added, all rights reserved by the author.
+Licensed under the [Apache License, Version 2.0](LICENSE); see [`NOTICE`](NOTICE). Unless
+you explicitly state otherwise, any contribution you submit for inclusion is licensed under the
+same terms, without additional conditions (Apache-2.0 §5).
+
+The license covers the code, schemas, prompts, configs and documentation. It does **not**
+relicense third-party imagery referenced by a dataset manifest: each manifest row carries its
+own `license` (see the [licensing policy](data/README.md#pii-consent-and-licensing-policy)).

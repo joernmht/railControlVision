@@ -1,0 +1,9 @@
+rail-vision-bench
+Copyright 2026 Joern Maurischat and the rail-vision-bench contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The Apache-2.0 license covers the source code, schemas, prompts, configs and
+documentation in this repository. It does not cover third-party imagery or
+video referenced by dataset manifests; each such item carries its own licence
+in the manifest's `license` field (see data/README.md).

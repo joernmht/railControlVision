@@ -7,13 +7,15 @@ name = "rail-vision-bench"
 version = "0.0.1"
 description = "Benchmark: how well off-the-shelf generative AI turns railway-control imagery into validated topology + state."
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 classifiers = [
   "Private :: Do Not Upload",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
 ]
 dynamic = ["dependencies"]
-# no `readme` (README.md is authored last) and no `license` (not chosen yet) on purpose
+# no `readme` on purpose: README.md documents the repository, not the (never uploaded) wheel
 
 [project.optional-dependencies]
 gpu = ["torch>=2.4", "torchvision>=0.19", "transformers>=4.45", "accelerate>=0.34", "qwen-vl-utils>=0.0.8"]

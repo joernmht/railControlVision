@@ -70,6 +70,8 @@ build-check:  ## build the wheel and verify dynamic deps + package data landed i
 	rm -rf dist
 	uv build
 	unzip -p dist/*.whl '*/METADATA' | grep -q '^Requires-Dist: pydantic>=2.9'
+	unzip -p dist/*.whl '*/METADATA' | grep -q '^License-Expression: Apache-2.0'
+	$(BIN)/python -m zipfile -l dist/*.whl | grep -q 'licenses/LICENSE'
 	$(BIN)/python -m zipfile -l dist/*.whl | grep -q 'rail_vision_bench/py.typed'
 	$(BIN)/python -m zipfile -l dist/*.whl | grep -q 'prompts/single_shot.md'
 

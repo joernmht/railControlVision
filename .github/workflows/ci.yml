@@ -21,7 +21,7 @@ jobs:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0   # setup-uv publishes no v10 major tag; pin the exact release
         with:
           version: "0.8.17"                      # the uv that produced requirements.lock; bump together with the lock
           python-version: ${{ matrix.python-version }}

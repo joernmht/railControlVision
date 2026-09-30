@@ -186,5 +186,6 @@ the wheel carries the dynamic requirements, `py.typed`, the prompts and the repo
 
 Use the checklist in `.github/pull_request_template.md`: lock regenerated when
 `requirements.txt` changed, schema regenerated when the models changed, `make check` green on
-both interpreters, new stubs raise and are listed, no fabricated results. Do not commit a
-`LICENSE` file: the license is still undecided (see the README).
+both interpreters, new stubs raise and are listed, no fabricated results. By opening a pull
+request you license your contribution under the repository's Apache-2.0 license (see
+`LICENSE`); there is no separate contributor agreement.

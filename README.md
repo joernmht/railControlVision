@@ -163,4 +163,19 @@ and a new literal, so documents can never silently cross versions. Details in
 
 ## License
 
-TODO: no license has been chosen yet; until one is added, all rights reserved by the author.
+Copyright 2026 Joern Maurischat and the rail-vision-bench contributors.
+
+The code, schema, prompts, configs, documentation and the synthetic example documents in this
+repository are licensed under the [Apache License, Version 2.0](LICENSE) (SPDX: `Apache-2.0`).
+Contributions are accepted under the same license (inbound = outbound, no CLA).
+
+Why Apache-2.0: it is permissive, carries an explicit patent grant and retaliation clause (this
+benchmark is meant to be used and extended by rail-signalling vendors and operators), and it is
+compatible with every direct dependency in `requirements.txt` (MIT, BSD, Apache-2.0, MPL-2.0 and
+PSF). The two copyleft packages in the tree, CairoSVG (LGPL-3.0-or-later) and DVC's transitive
+`grandalf` (GPL-2.0), are used unmodified through their public interfaces and are not
+redistributed here, which places no obligations on this project's license.
+
+The license covers the repository contents only. Real control-room imagery and its ground truth
+are governed by the per-row `license` field of the dataset manifest and the policy in
+[`data/README.md`](data/README.md); they are never covered by this file implicitly.

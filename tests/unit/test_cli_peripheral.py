@@ -14,6 +14,7 @@ import yaml
 from typer.testing import CliRunner
 
 from rail_vision_bench.cli import EXIT_NOT_IMPLEMENTED, EXIT_OK, EXIT_USAGE, app
+from tests.conftest import plain
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> Path:
@@ -60,8 +61,9 @@ def test_synth_generate_requires_out(cli: CliRunner):
 def test_serve_help(cli: CliRunner):
     result = cli.invoke(app, ["serve", "--help"])
     assert result.exit_code == EXIT_OK, result.output
+    output = plain(result.output)
     for option in ("--host", "--port", "--reload"):
-        assert option in result.output
+        assert option in output
 
 
 def test_run_without_dry_run_is_not_implemented(cli: CliRunner, tmp_path: Path):

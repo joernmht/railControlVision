@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,19 @@ from typer.testing import CliRunner
 
 from rail_vision_bench.schema.models import SceneAnnotation
 from rail_vision_bench.settings import SETTINGS_ENV_KEYS, get_settings
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def plain(text: str) -> str:
+    """Strip ANSI escape codes from CLI output.
+
+    typer forces rich colour rendering when GITHUB_ACTIONS, FORCE_COLOR or PY_COLORS is set,
+    and rich styles option names with escape codes inside the token, so substring checks on
+    help output must run on the stripped text.
+    """
+    return _ANSI_RE.sub("", text)
+
 
 # Deadlines are disabled in both profiles because validation time depends on the
 # generated scene size; the CI profile is derandomized so failures are reproducible.

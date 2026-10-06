@@ -569,3 +569,11 @@ def test_repair_truncated_json():
     doc = lenient_document(cut, 1.0, _doc())
     assert doc is not None
     assert doc.topology.nodes
+
+
+def test_merge_single_model_keeps_everything():
+    draft = merge([("only", _doc())], run_id="r")
+    review = draft.meta["review"]
+    assert len(draft.topology.nodes) == len(STATION["topology"]["nodes"])
+    assert review["suggestions"] == {}
+    assert all(e["status"] == "consensus" for e in review["elements"].values())

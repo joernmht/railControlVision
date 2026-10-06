@@ -513,7 +513,8 @@ def merge(
 
     Args:
         docs: ``(model name, document)`` pairs in merge order (ties go to earlier models).
-        min_support: Models that must agree before an element enters the draft.
+        min_support: Models that must agree before an element enters the draft; capped at the
+            number of documents, so a single-model pre-fill puts every element in the draft.
         run_id: The pre-fill run, recorded in ``meta.review``.
 
     Returns:
@@ -526,6 +527,7 @@ def merge(
     if not docs:
         msg = "nothing to merge"
         raise ValueError(msg)
+    min_support = min(min_support, len(docs))  # a single-model pre-fill keeps everything
     merger = _Merger(docs, min_support)
     for family in _FAMILIES:
         merger.cluster(family)

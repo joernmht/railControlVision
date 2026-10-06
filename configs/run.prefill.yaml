@@ -1,3 +1,6 @@
+# HISTORICAL: the five-model pre-fill of the first 34 images (2026-10-06). New pre-fill runs use
+# ONE strong model on screened images only (run policy in data/README.md); copy this file and
+# reduce `models` to that model.
 # Ground-truth pre-fill run: every pilot image through the pre-fill lineup with the
 # recall-oriented `prefill` prompt, single shot; the drafts Joern corrects are merged from it.
 # The neutral benchmark run is configs/run.baseline.yaml (same models, prompt single_shot).

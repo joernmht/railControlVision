@@ -158,9 +158,25 @@ no manifest rows; when a scene gets a `SceneAnnotation`, its row copies `license
 
 ## Ground truth: model pre-fill and human review
 
-Real panel photos are not labelled from scratch. Several current vision models transcribe each
-image, their answers are merged into a draft, and a railway-operations expert corrects the draft
-on a review page; the corrected document is the ground truth.
+Real panel photos are not labelled from scratch. A strong vision model transcribes each image into
+a draft, and a railway-operations expert corrects every draft on a review page; the corrected
+document is the ground truth. (The first 34 images were pre-filled by five models merged into a
+consensus draft; see the run policy below for how it is done from now on.)
+
+### Run policy (Joern, 2026-10-06)
+
+1. **Screen before spending.** Every image first gets one cheap suitability question (e.g. a
+   typed yes/no decision: is a railway control panel shown roughly frontally and legibly enough to
+   read its track layout, plus a legibility score). Only images that pass go to expensive models.
+   Non-frontal, overview or illegible shots stay in the dataset in an explicitly labelled
+   hard/other split, without a full pre-fill.
+2. **One strong model pre-fills.** Drafts come from a single strong model with the `prefill`
+   prompt; the reviewer checks every draft, which is the safeguard against its bias. The
+   five-model consensus is not used for new images. With one document, `review.consensus.merge`
+   puts every element in the draft (status `consensus`, support 1/1).
+3. **More models are benchmark contestants only**: they run on the neutral `single_shot` prompt and
+   only on screened images.
+4. **Estimate before every paid run** and report it; the shared OpenRouter key has a hard limit.
 
 ```sh
 bench commons manifest                                   # data/gt/panel_photo_v1/manifest.jsonl
@@ -177,7 +193,7 @@ dvc add data/runs data/review data/gt && dvc push
   `single_shot` prompt with provider defaults (`configs/models.openrouter.yaml`). Both are kept
   under `data/runs/` and both are scored once the ground truth exists; the benchmark run is the
   headline result.
-- **Consensus.** `review.consensus.merge` clusters elements across models with the metric
+- **Consensus (first 34 images only).** `review.consensus.merge` clusters elements across models with the metric
   matcher; an element enters the draft when at least two models produced it (or a draft element
   references it), single-model elements become one-tap *suggestions*. `meta.review.elements`
   records per element its support, the supporting models, a status (`consensus`: more than half
@@ -194,8 +210,11 @@ dvc add data/runs data/review data/gt && dvc push
 Ground truth seeded by models is biased towards those models: every error the reviewer misses
 counts in their favour. The mitigations, and what any paper using this data must report:
 
-1. **Consensus of several vendors** (Anthropic, OpenAI, Google and two open-weight models), so no
-   single model's habits define the draft; contested and minority elements are highlighted.
+1. **Human review of every draft.** The first 34 drafts were a consensus of five vendors
+   (Anthropic, OpenAI, Google and two open-weight models) with contested and minority elements
+   highlighted; later drafts come from one model, and the reviewer checks each of them. The
+   seeding model(s) of every scene are recorded (`meta.prefill.models`) so that a comparison can
+   report them separately.
 2. **Per-element provenance** in every ground-truth file, so results can be split by
    human-verified versus accepted-as-drafted elements.
 3. **Report the share of human-edited elements** (`human_share`, plus deletions) per scene and

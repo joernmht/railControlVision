@@ -96,6 +96,7 @@ reference, **2** on a usage error (typer) and **3** when a command reaches a ske
 | `bench eval RUN_DIR` | Score a run into `metrics.parquet` and `summary.json`. | stubbed | 2 / 3 |
 | `bench report RUN_DIRS... [--out PATH]` | Render a leaderboard (default `reports/leaderboard.html`). | stubbed | 2 / 3 |
 | `bench synth generate --out DIR [--n] [--seed] [--augment]` | Generate synthetic panels with ground truth and a manifest. | stubbed | 2 / 3 |
+| `bench commons ingest\|status\|promote\|import-db\|attribution` | Stage licence-filtered Wikimedia Commons panel photos, curate them, promote the accepted ones into `data/raw/commons` and render the attribution list (see [`data/README.md`](data/README.md#wikimedia-commons-source-images)). | implemented | 0 / 1 / 2 |
 | `bench serve [--host] [--port] [--reload]` | Serve the harness (defaults from `RVB_HARNESS_HOST` / `RVB_HARNESS_PORT`). | implemented for the live endpoints | 0 / 2 |
 
 `--strict` promotes `STATE_MISSING`, `GEOM_OUT_OF_BOUNDS` and `ROUTE_SWITCH_MISSING` from

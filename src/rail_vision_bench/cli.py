@@ -29,6 +29,8 @@ schema_app = typer.Typer(no_args_is_help=True, help="Schema tools.")
 app.add_typer(schema_app, name="schema")
 synth_app = typer.Typer(no_args_is_help=True, help="Synthetic data.")
 app.add_typer(synth_app, name="synth")
+commons_app = typer.Typer(no_args_is_help=True, help="Wikimedia Commons source images.")
+app.add_typer(commons_app, name="commons")
 
 EXIT_OK = 0
 EXIT_INVALID = 1
@@ -42,6 +44,8 @@ err_console = Console(stderr=True)
 # the help text shows the same default the Makefile uses.
 DEFAULT_SCHEMA_PATH = Path("schema/v0.json")
 DEFAULT_REPORT_PATH = Path("reports/leaderboard.html")
+DEFAULT_COMMONS_DIR = Path("data/raw/commons")
+DEFAULT_STAGING_DIR = Path("data/incoming/commons")
 
 
 def _not_implemented(exc: NotImplementedError) -> NoReturn:
@@ -289,6 +293,103 @@ def synth_generate(
     except NotImplementedError as exc:
         _not_implemented(exc)
     console.print(f"manifest written to {manifest}", highlight=False)
+
+
+@commons_app.command("ingest")
+def commons_ingest(
+    staging: Annotated[
+        Path, typer.Option("--staging", help="Staging directory for new candidates.")
+    ] = DEFAULT_STAGING_DIR,
+    dest: Annotated[
+        Path, typer.Option("--dest", help="Promoted set; its images count as already seen.")
+    ] = DEFAULT_COMMONS_DIR,
+    term: Annotated[
+        list[str] | None,
+        typer.Option("--term", help="Search query; repeatable (default: the built-in terms)."),
+    ] = None,
+    per_term: Annotated[int, typer.Option("--per-term", min=1, max=50)] = 25,
+) -> None:
+    """Search Commons and stage new allow-listed images as curation candidates."""
+    from rail_vision_bench.ingest.commons import SEARCH_TERMS, ingest
+
+    counts = ingest(staging, terms=term or SEARCH_TERMS, per_term=per_term, known=[dest])
+    console.print(
+        f"seen {counts.seen}, new {counts.new}, duplicate {counts.duplicate}, "
+        f"licence rejected {counts.licence_rejected}, unsuitable {counts.unsuitable}, "
+        f"failed {counts.failed}",
+        highlight=False,
+    )
+
+
+@commons_app.command("promote")
+def commons_promote(
+    staging: Annotated[
+        Path, typer.Option("--staging", help="Staging directory.")
+    ] = DEFAULT_STAGING_DIR,
+    dest: Annotated[Path, typer.Option("--dest", help="Data-plane directory.")] = (
+        DEFAULT_COMMONS_DIR
+    ),
+) -> None:
+    """Copy the accepted staged images into the data plane."""
+    from rail_vision_bench.ingest.commons import promote
+
+    promoted = promote(staging, dest)
+    console.print(f"promoted {len(promoted)} image(s) into {dest}", highlight=False)
+
+
+@commons_app.command("import-db")
+def commons_import_db(
+    db: Annotated[
+        Path, typer.Argument(exists=True, dir_okay=False, help="The panelvision.db file.")
+    ],
+    dest: Annotated[Path, typer.Option("--dest", help="Source directory.")] = DEFAULT_COMMONS_DIR,
+) -> None:
+    """Import the accepted, allow-listed images of the raiLPoperator panelvision prototype."""
+    from rail_vision_bench.ingest.commons import import_panelvision_db
+
+    try:
+        records = import_panelvision_db(db, dest)
+    except ValueError as exc:
+        _fail(str(exc))
+    console.print(f"imported {len(records)} image(s) into {dest}", highlight=False)
+
+
+@commons_app.command("status")
+def commons_status(
+    source_id: Annotated[str, typer.Argument(help="The record to change.")],
+    status: Annotated[str, typer.Argument(help="candidate, accepted or rejected.")],
+    dest: Annotated[Path, typer.Option("--dest", help="Source directory.")] = (DEFAULT_STAGING_DIR),
+) -> None:
+    """Set the curation status of one source image."""
+    from rail_vision_bench.dataset.sources import CurationStatus
+    from rail_vision_bench.ingest.commons import set_status
+
+    try:
+        new_status = CurationStatus(status)
+    except ValueError:
+        raise typer.BadParameter(f"unknown status {status!r}", param_hint="STATUS") from None
+    try:
+        set_status(dest, source_id, new_status)
+    except KeyError:
+        _fail(f"no source image {source_id!r} in {dest / 'sources.jsonl'}")
+    console.print(f"{source_id}: {new_status}", highlight=False)
+
+
+@commons_app.command("attribution")
+def commons_attribution(
+    dest: Annotated[Path, typer.Option("--dest", help="Source directory.")] = DEFAULT_COMMONS_DIR,
+    out: Annotated[Path | None, typer.Option("--out", help="Write here instead of stdout.")] = None,
+) -> None:
+    """Render the attribution list of the accepted source images."""
+    from rail_vision_bench.dataset.sources import attribution_markdown, read_sources
+
+    text = attribution_markdown(read_sources(dest / "sources.jsonl"))
+    if out is None:
+        typer.echo(text, nl=False)
+        return
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    console.print(f"attribution written to {out}", highlight=False)
 
 
 @app.command()

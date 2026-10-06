@@ -38,3 +38,6 @@ mlartifacts/
 .vscode/
 
 # data/, .dvc/, .dvcignore and *.dvc are deliberately NOT listed: DVC manages its own ignore entries after `dvc init` / `dvc add`
+
+# staging area for downloaded, not-yet-curated images (bench commons ingest); never in git or DVC
+data/incoming/

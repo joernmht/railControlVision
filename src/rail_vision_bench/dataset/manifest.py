@@ -28,6 +28,11 @@ class ManifestRow(BaseModel):
     width: Annotated[int, Field(ge=1)]
     height: Annotated[int, Field(ge=1)]
     license: str | None = Field(default=None, description="SPDX id or free text; null if unknown.")
+    license_url: str | None = Field(default=None, description="URL of the licence terms.")
+    author: str | None = Field(default=None, description="Author to credit for the image.")
+    source_url: str | None = Field(
+        default=None, description="Page documenting where the image came from."
+    )
     quality: dict[str, float] | None = Field(
         default=None, description="QualityMetrics fields when measured."
     )

@@ -59,10 +59,12 @@ end says what exists today; everything else is design that the stubs' docstrings
 | `agents.single_shot` / `agents.deep` | baseline runner; deepagents variant | stubbed |
 | `tools.tools` / `tools.mcp_server` | `TOOL_NAMES`, `ToolResult`, `crop`/`read`/`validate`/`render`; `serve_mcp` | `validate_tool` real; rest stubbed |
 | `ingest.image` / `video` / `screen` / `preprocess` / `quality` | loaders, `Frame`, capture, OpenCV helpers, `QualityMetrics` + `measure` | `Frame` and `QualityMetrics` real; functions stubbed |
+| `ingest.commons` | Wikimedia Commons search and download with the licence allow-list, staging, `promote`, prototype import | implemented |
 | `synth.generate` / `render` / `augment` | dataset generation, SVG rendering, albumentations presets | stubbed |
 | `eval.records` / `matching` / `metrics` / `aggregate` | `PredictionRecord`, `MetricResult`; `Match`, `match_elements`; `METRIC_NAMES` + functions; `aggregate_run` | models and names real; computations stubbed |
 | `harness.app` / `models` / `metrics` / `client` | FastAPI app; wire models; Prometheus registry; `HarnessClient` | health/metrics/validate real; frame/stream not served |
 | `dataset.manifest` / `splits` / `hub` | `ManifestRow` + JSONL; `assign_partition`, `difficulty_tier`; Hub push/pull | manifest and splits real; hub stubbed |
+| `dataset.licensing` / `sources` | licence families, allow-list, SPDX mapping; `SourceRecord` + `sources.jsonl`, attribution list | implemented |
 | `tracking.base` / `mlflow_tracker` | `Tracker`, `NullTracker`, `get_tracker`; `MlflowTracker` | null tracker real; MLflow stubbed |
 | `report.render` | `load_template`, `render_leaderboard` | template loads; rendering stubbed |
 

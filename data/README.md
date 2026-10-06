@@ -180,8 +180,10 @@ dvc add data/runs data/review data/gt && dvc push
 - **Consensus.** `review.consensus.merge` clusters elements across models with the metric
   matcher; an element enters the draft when at least two models produced it (or a draft element
   references it), single-model elements become one-tap *suggestions*. `meta.review.elements`
-  records per element its support, the supporting models, a status (`consensus` when a majority
-  agrees on it and every attribute, else `disputed`) and the disagreeing attributes.
+  records per element its support, the supporting models, a status (`consensus`: more than half
+  of the models produced it and agree on every attribute; `contested`: more than half produced it
+  but disagree on an attribute; `minority`: at most half produced it) and the disagreeing
+  attributes.
 - **Per-element provenance.** `bench review` finalizes a draft only when it is strict-valid and
   stamps `meta.provenance[id]` with `prefill_accepted`, `suggestion_accepted`, `human_edited` or
   `human_added`; `meta.review_summary` counts them, the elements deleted from the draft and the
@@ -193,7 +195,7 @@ Ground truth seeded by models is biased towards those models: every error the re
 counts in their favour. The mitigations, and what any paper using this data must report:
 
 1. **Consensus of several vendors** (Anthropic, OpenAI, Google and two open-weight models), so no
-   single model's habits define the draft; disputed elements are highlighted for review.
+   single model's habits define the draft; contested and minority elements are highlighted.
 2. **Per-element provenance** in every ground-truth file, so results can be split by
    human-verified versus accepted-as-drafted elements.
 3. **Report the share of human-edited elements** (`human_share`, plus deletions) per scene and

@@ -7,12 +7,12 @@
 <style>
 :root {
   --bg: #f6f7f8; --fg: #1b1f23; --muted: #5f6b76; --card: #ffffff; --line: #d8dde2;
-  --accent: #00838f; --ok: #2e7d32; --warn: #e65100; --edit: #1565c0; --add: #6a1b9a;
+  --accent: #00838f; --ok: #2e7d32; --warn: #e65100; --amber: #f9a825; --edit: #1565c0; --add: #6a1b9a;
   --sel: #d50000; --err: #c62828;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #0f1418; --fg: #e8ecef; --muted: #9aa7b2; --card: #182027; --line: #2b3640;
-          --accent: #4dd0e1; --ok: #66bb6a; --warn: #ffa726; --edit: #64b5f6; --add: #ce93d8;
+          --accent: #4dd0e1; --ok: #66bb6a; --warn: #ff7043; --amber: #ffd54f; --edit: #64b5f6; --add: #ce93d8;
           --sel: #ff5252; --err: #ef5350; }
 }
 * { box-sizing: border-box; }
@@ -38,7 +38,7 @@ main { padding: 12px; max-width: 1100px; margin: 0 auto; }
 .pill.in_progress { color: var(--edit); border-color: var(--edit); }
 .pill.todo { color: var(--warn); border-color: var(--warn); }
 .muted { color: var(--muted); font-size: 13px; }
-#stage { position: relative; overflow: auto; height: 58vh; background: #000; border-radius: 8px;
+#stage { position: relative; overflow: auto; max-height: 62vh; background: #000; border-radius: 8px;
   touch-action: pan-x pan-y pinch-zoom; }
 #canvas { position: relative; transform-origin: 0 0; }
 #canvas img { display: block; width: 100%; user-select: none; -webkit-user-select: none; }
@@ -58,7 +58,7 @@ main { padding: 12px; max-width: 1100px; margin: 0 auto; }
 #toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--fg); color: var(--bg);
   padding: 8px 14px; border-radius: 8px; display: none; z-index: 10; max-width: 90vw; }
 @media (min-width: 900px) { #editor { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
-  #stage { height: 80vh; } }
+  #stage { max-height: 82vh; } }
 </style>
 </head>
 <body>
@@ -69,9 +69,10 @@ main { padding: 12px; max-width: 1100px; margin: 0 auto; }
 </header>
 <main>
   <section id="listview">
-    <p class="muted">Each draft is the consensus of several models. Orange = disputed (low support or
-      the models disagree), green = consensus. Correct, check, then finalize. Unpublished data:
-      tailnet only.</p>
+    <p class="muted">Each draft merges five models. Green = consensus (most models found it and agree),
+      amber = contested (most found it, they disagree on an attribute), orange = minority (found by
+      at most half). Blue = edited by you, purple = added by you. Correct, check, then finalize.
+      Unpublished data: tailnet only.</p>
     <div class="cards" id="cards"></div>
   </section>
   <section id="editor" hidden>
@@ -156,7 +157,7 @@ function colour(f, e) {
   if (c === "added") return "var(--add)";
   if (c === "edited") return "var(--edit)";
   const info = draftInfo(e.id);
-  return info && info.status === "consensus" ? "var(--ok)" : "var(--warn)";
+  return !info ? "var(--warn)" : info.status === "consensus" ? "var(--ok)" : info.status === "contested" ? "var(--amber)" : "var(--warn)";
 }
 function point(e) {
   const g = e.geometry || {};
@@ -185,7 +186,7 @@ async function showList() {
     <div class="card" data-id="${esc(s.scene_id)}">
       <img loading="lazy" src="/api/scenes/${encodeURIComponent(s.scene_id)}/image" alt="">
       <div><b>${esc(s.scene_id)}</b> <span class="pill ${s.status}">${s.status.replace("_", " ")}</span></div>
-      <div class="muted">${esc(s.panel_group || "")} &middot; ${s.partition} &middot; ${s.elements} elements, ${s.disputed} disputed</div>
+      <div class="muted">${esc(s.panel_group || "")} &middot; ${s.partition} &middot; ${s.elements} elements, ${s.consensus} consensus</div>
     </div>`).join("");
   document.querySelectorAll(".card").forEach((c) => c.onclick = () => { location.hash = c.dataset.id; });
 }
@@ -358,7 +359,7 @@ function drawTab() {
     const rows = [];
     for (const f of families()) for (const e of fam(S.doc, f)) {
       const info = draftInfo(e.id), c = changed(f, e);
-      const rank = c ? 2 : info && info.status === "disputed" ? 0 : 1;
+      const rank = c ? 3 : !info ? 0 : { minority: 0, contested: 1, consensus: 2 }[info.status];
       rows.push({ rank, html: `<div class="row" data-id="${esc(e.id)}"><span class="dot" style="background:${colour(f, e)}"></span>
         <span style="flex:1">${checked().includes(e.id) ? "&check; " : ""}<b>${esc(e.id)}</b> ${esc(e.kind || f.slice(0, -1))} ${esc(e.label || "")}</span>
         <span class="muted">${info ? info.support + "/" + info.of : c}</span></div>` });

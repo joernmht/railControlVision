@@ -10,8 +10,8 @@ A cluster enters the draft when at least ``min_support`` models produced it, or 
 element references it. Clusters with less support become *suggestions* the reviewer can adopt
 with one tap. Everything the reviewer needs to judge the draft is in ``meta.review``: which
 models were merged, and per element its support, the supporting models, its status
-(``consensus`` when a majority of the models agree on it and on every attribute, otherwise
-``disputed``) and the attributes the models disagreed on.
+(:func:`status`: ``consensus``, ``contested`` or ``minority``) and the attributes the models
+disagreed on.
 
 Model-seeded ground truth is biased towards the seeding models wherever the reviewer misses
 an error; per-element support and the later share of human-edited elements make that bias
@@ -20,6 +20,7 @@ measurable (see ``data/README.md``).
 
 from __future__ import annotations
 
+import json
 import math
 import statistics
 from collections import Counter
@@ -109,19 +110,74 @@ def majority(values: Sequence[T], key: Callable[[T], Hashable] = lambda v: v) ->
     return winner, best / len(values)
 
 
+def repair_truncated_json(text: str) -> dict[str, Any] | None:
+    """Recover the complete part of a JSON object that was cut off mid-way.
+
+    Answers that hit the output-token limit stop in the middle of an element. The text is
+    scanned (strings and escapes respected) and cut right after the last value that was
+    closed completely; the brackets still open at that point are then closed.
+
+    Args:
+        text: The model output.
+
+    Returns:
+        The recovered object, or ``None`` when no prefix can be closed into an object.
+    """
+    start = text.find("{")
+    if start < 0:
+        return None
+    body = text[start:]
+    stack: list[str] = []
+    in_string = escaped = False
+    cut: tuple[int, str] | None = None
+    for index, char in enumerate(body):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "{[":
+            stack.append(char)
+        elif char in "}]":
+            if not stack:
+                break
+            stack.pop()
+            cut = (index + 1, "".join(stack))
+            if not stack:
+                break
+    if cut is None:
+        return None
+    position, still_open = cut
+    closing = "".join("}" if bracket == "{" else "]" for bracket in reversed(still_open))
+    try:
+        value = json.loads(body[:position] + closing)
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def lenient_document(raw_text: str, scale: float, base: SceneAnnotation) -> SceneAnnotation | None:
     """Recover what is valid from an answer that failed the strict schema.
 
     Each element and state entry is validated on its own and dropped when invalid, so one bad
-    enum value does not discard a whole panel. ``base`` supplies the header fields.
+    enum value does not discard a whole panel. An answer cut off at the output-token limit is
+    recovered up to its last complete value. ``base`` supplies the header fields.
 
     Returns:
         The recovered document, or ``None`` when the answer holds no JSON object.
     """
     try:
-        raw = rescale_geometry(extract_json(raw_text), scale)
+        decoded: dict[str, Any] | None = extract_json(raw_text)
     except ValueError:
+        decoded = repair_truncated_json(raw_text)
+    if decoded is None:
         return None
+    raw = rescale_geometry(decoded, scale)
 
     def keep(items: Any, model: type[BaseModel]) -> list[dict[str, Any]]:
         out = []
@@ -380,7 +436,7 @@ class _Merger:
             "of": len(self.docs),
             "models": cluster.models,
             "disagree": disagree,
-            "status": "consensus" if support * 2 > len(self.docs) and not disagree else "disputed",
+            "status": status(support, len(self.docs), disagree),
         }
         return element, review
 
@@ -408,6 +464,18 @@ class _Merger:
             return None
         merged, share = majority(entries, lambda e: repr(sorted(e.items())))
         return name, merged, ([] if share == 1.0 else [f"state.{name}"])
+
+
+def status(support: int, of: int, disagree: Sequence[str]) -> str:
+    """Review status of a merged element.
+
+    ``consensus``: more than half of the models produced it and they agree on every attribute;
+    ``contested``: more than half produced it but they disagree on an attribute;
+    ``minority``: at most half of the models produced it.
+    """
+    if support * 2 <= of:
+        return "minority"
+    return "contested" if disagree else "consensus"
 
 
 def references(element: dict[str, Any]) -> list[str]:
@@ -473,7 +541,7 @@ def merge(
             merged_state = merger.state(cluster)
             if merged_state is not None and merged_state[2]:
                 review["disagree"] += merged_state[2]
-                review["status"] = "disputed"
+                review["status"] = status(review["support"], review["of"], review["disagree"])
             built[cluster.draft_id] = (family, element, review, merged_state)
 
     chosen: set[str] = set()

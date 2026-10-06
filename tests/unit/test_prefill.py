@@ -405,8 +405,17 @@ def test_merge_flags_disagreement_and_keeps_single_model_elements_as_suggestions
     suggested = [s for s in review["suggestions"].values() if s["family"] == "nodes"]
     assert len(suggested) == 1
     assert suggested[0]["models"] == ["a"]
-    disputed = [e for e in review["elements"].values() if e["status"] == "disputed"]
-    assert any("kind" in e["disagree"] for e in disputed)
+    contested = [e for e in review["elements"].values() if e["status"] == "contested"]
+    assert any("kind" in e["disagree"] for e in contested)
+
+
+def test_status_tiers():
+    from rail_vision_bench.review.consensus import status
+
+    assert status(3, 5, []) == "consensus"
+    assert status(3, 5, ["kind"]) == "contested"
+    assert status(2, 5, []) == "minority"
+    assert status(2, 4, []) == "minority"
 
 
 def test_lenient_document_drops_only_invalid_elements():
@@ -543,3 +552,20 @@ def test_build_drafts_skips_existing(tmp_path: Path):
     draft = SceneAnnotation.model_validate_json(written[0].read_bytes())
     assert draft.meta["review"]["models"] == ["a", "b", "c"]  # c recovered leniently
     assert build_drafts(records, data_dir=data, split="s1", models=["a"], run_id="r") == []
+
+
+def test_repair_truncated_json():
+    from rail_vision_bench.review.consensus import repair_truncated_json
+
+    full = json.dumps(STATION)
+    cut = full[: len(full) // 2]
+    repaired = repair_truncated_json("Sure: " + cut)
+    assert repaired is not None
+    assert repaired["schema_version"] == "v0"
+    assert 0 < len(repaired["topology"]["nodes"]) <= len(STATION["topology"]["nodes"])
+    assert repair_truncated_json('{"a": "unterminated [ { string') is None
+    assert repair_truncated_json('{"a": "x\\"}"}') == {"a": 'x"}'}
+    assert repair_truncated_json("no json") is None
+    doc = lenient_document(cut, 1.0, _doc())
+    assert doc is not None
+    assert doc.topology.nodes

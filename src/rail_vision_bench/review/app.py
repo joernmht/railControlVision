@@ -118,7 +118,7 @@ def create_review_app(data_dir: Path, split: str, *, annotator: str) -> FastAPI:
                     "partition": row.partition,
                     "status": status,
                     "elements": len(elements),
-                    "disputed": sum(1 for e in elements.values() if e["status"] == "disputed"),
+                    "consensus": sum(1 for e in elements.values() if e["status"] == "consensus"),
                     "width": row.width,
                     "height": row.height,
                 }

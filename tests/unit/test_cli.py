@@ -12,7 +12,8 @@ from typer.testing import CliRunner
 
 from rail_vision_bench import __version__
 from rail_vision_bench.cli import EXIT_INVALID, EXIT_NOT_IMPLEMENTED, EXIT_OK, EXIT_USAGE, app
-from tests.conftest import EXAMPLES_DIR, FIXTURES_DIR, REPO_ROOT
+from rail_vision_bench.settings import get_settings
+from tests.conftest import EXAMPLES_DIR, FIXTURES_DIR, REPO_ROOT, plain
 
 HELP_COMMANDS = [
     [],
@@ -255,12 +256,22 @@ def test_run_dry_run_invalid_config(cli: CliRunner, tmp_path: Path):
     assert result.exit_code == EXIT_INVALID
 
 
-def test_run_without_dry_run_is_not_implemented(cli: CliRunner, tmp_path: Path):
+def test_run_without_a_manifest_fails(
+    cli: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("RVB_DATA_DIR", str(tmp_path / "data"))
+    get_settings.cache_clear()
     config = _run_setup(tmp_path)
     result = cli.invoke(app, ["run", "--config", str(config)])
+    assert result.exit_code == EXIT_INVALID, result.output
+    assert "manifest.jsonl" in plain(result.output)
+
+
+def test_run_agentic_is_not_implemented(cli: CliRunner, tmp_path: Path):
+    config = _run_setup(tmp_path)
+    result = cli.invoke(app, ["run", "--config", str(config), "--mode", "agentic"])
     assert result.exit_code == EXIT_NOT_IMPLEMENTED
-    assert "[not implemented]" in result.output
-    assert "run_benchmark" in result.output
+    assert "_run_agentic" in result.output
 
 
 def test_eval_is_not_implemented(cli: CliRunner, tmp_path: Path):

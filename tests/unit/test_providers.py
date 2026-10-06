@@ -24,7 +24,7 @@ def test_get_provider_resolves_every_name(name: str):
     assert getattr(provider, "settings", None) is settings
 
 
-@pytest.mark.parametrize("name", PROVIDER_NAMES)
+@pytest.mark.parametrize("name", [n for n in PROVIDER_NAMES if n != "openai"])
 async def test_complete_is_a_stub(name: str):
     provider = get_provider(name, Settings(_env_file=None))
     with pytest.raises(NotImplementedError, match="not implemented in the skeleton"):

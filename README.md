@@ -18,13 +18,13 @@ fakes a result. What actually works today:
 
 | Implemented | Stubbed (raises `NotImplementedError`, CLI exit code 3) |
 | --- | --- |
-| Schema v0: pydantic models, JSON Schema export (`schema/v0.json`), drift check | Provider `complete()` for all six backends |
-| Semantic validator (graph rules, state rules, route walker, strict mode) | Agent nodes (planner … critic), single-shot runner, deep-agent variant |
+| Schema v0: pydantic models, JSON Schema export (`schema/v0.json`), drift check | Provider `complete()` for anthropic, gemini, mistral, ollama, litellm (the OpenAI-compatible provider is real and reaches every vendor through OpenRouter) |
+| Semantic validator (graph rules, state rules, route walker, strict mode) | Agent nodes (planner … critic), agentic run mode, deep-agent variant |
 | Valid-by-construction topology/scene generator used by the property tests | `crop`/`read`/`render` tools and the MCP server (`validate` tool is real) |
-| `bench validate`, `bench schema export`, `bench run --dry-run` | `bench run` (without `--dry-run`), `bench eval`, `bench report`, `bench synth generate` |
+| `bench validate`, `bench schema export`, `bench run` (single-shot, resumable), `bench commons`, `bench review` | `bench run --mode agentic`, `bench eval`, `bench report`, `bench synth generate` |
 | Harness: `GET /health`, `GET /metrics`, `POST /validate`; `HarnessClient` | Harness inference: `POST /frame` answers 501, `WS /stream` closes with 1011 |
 | Configs (run / task / model catalogue), settings, run-directory contract | Ingest (image, video, screen, preprocessing, quality), synthetic rendering and augmentation |
-| Manifest JSONL, deterministic dev/test partition, difficulty tiers | Element matching, every metric, parquet aggregation, MLflow tracker, Hub push/pull, report rendering |
+| Manifest JSONL, deterministic dev/test partition, difficulty tiers; element matching; ground-truth pre-fill consensus and review app | Every metric, parquet aggregation, MLflow tracker, Hub push/pull, report rendering |
 | LangGraph wiring of the six-node loop with the critic → planner edge | |
 
 `tests/unit/test_stubs.py` enumerates every stub and asserts it raises with a non-empty docstring,
@@ -92,10 +92,11 @@ reference, **2** on a usage error (typer) and **3** when a command reaches a ske
 | `bench --version` | Print the package version. | implemented | 0 |
 | `bench validate FILES... [--strict] [--schema PATH] [--json]` | Validate documents against schema v0 and the semantic rules; table or one JSON object `{file: report}`. | implemented | 0 / 1 / 2 |
 | `bench schema export [--out PATH] [--check]` | Write `schema/v0.json` from the models, or check the committed file for drift. | implemented | 0 / 1 / 2 |
-| `bench run --config PATH [--model NAME]... [--mode] [--limit] [--seed] [--out] [--dry-run]` | Resolve a run config (task file, catalogue, model names) and, without `--dry-run`, execute it. | `--dry-run` implemented; execution stubbed | 0 / 1 / 2 / 3 |
+| `bench run --config PATH [--model NAME]... [--mode] [--limit] [--seed] [--out] [--dry-run] [--retry-failed] [--concurrency N]` | Resolve a run config (task file, catalogue, model names) and, without `--dry-run`, drive every scene of the task split through every model, appending to `predictions.jsonl`; rerunning resumes. | single-shot implemented; agentic stubbed | 0 / 1 / 2 / 3 |
 | `bench eval RUN_DIR` | Score a run into `metrics.parquet` and `summary.json`. | stubbed | 2 / 3 |
 | `bench report RUN_DIRS... [--out PATH]` | Render a leaderboard (default `reports/leaderboard.html`). | stubbed | 2 / 3 |
 | `bench synth generate --out DIR [--n] [--seed] [--augment]` | Generate synthetic panels with ground truth and a manifest. | stubbed | 2 / 3 |
+| `bench review drafts RUN_DIR [--split] [--overwrite]`, `bench review serve [--split] [--port] [--annotator]` | Merge a pre-fill run into consensus drafts; serve the review page on 127.0.0.1 (tailnet only) where drafts are corrected and finalized into ground truth (see [`data/README.md`](data/README.md#ground-truth-model-pre-fill-and-human-review)). | implemented | 0 / 1 / 2 |
 | `bench commons ingest\|status\|group\|blur\|promote\|import-db\|attribution` | Stage licence-filtered Wikimedia Commons panel photos, curate them (reason, panel group, face blurring), promote the accepted ones into `data/raw/commons` and render the attribution list (see [`data/README.md`](data/README.md#wikimedia-commons-source-images)). | implemented | 0 / 1 / 2 |
 | `bench serve [--host] [--port] [--reload]` | Serve the harness (defaults from `RVB_HARNESS_HOST` / `RVB_HARNESS_PORT`). | implemented for the live endpoints | 0 / 2 |
 

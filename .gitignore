@@ -26,8 +26,8 @@ htmlcov/
 .env.*.local
 
 # benchmark outputs and local tracking stores
-runs/
-reports/
+/runs/
+/reports/
 mlruns/
 mlartifacts/
 

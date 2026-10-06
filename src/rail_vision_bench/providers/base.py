@@ -45,6 +45,10 @@ class VisionRequest(BaseModel):
     )
     max_tokens: int = 4096
     temperature: float = 0.0
+    extra: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Provider-specific body fields, e.g. OpenRouter's reasoning settings.",
+    )
 
 
 class VisionResponse(BaseModel):

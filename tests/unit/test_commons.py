@@ -461,3 +461,33 @@ def test_cli_commons_group_blur_and_note(tmp_path: Path, cli: CliRunner):
     assert cli.invoke(app, ["commons", "blur", "a", "--box", "1,2,3", *d]).exit_code == 2
     assert cli.invoke(app, ["commons", "blur", "a", "--box", "a,b,c,d", *d]).exit_code == 2
     assert cli.invoke(app, ["commons", "blur", "a", "--box", "500,500,600,600", *d]).exit_code == 1
+
+
+def test_attribution_uses_display_title_and_url():
+    record = _record(
+        "a",
+        status=CurationStatus.ACCEPTED,
+        title="File:Two named people at the panel.jpg",
+        display_title="NX panel, signal box",
+        display_url="https://commons.wikimedia.org/?curid=1",
+    )
+    text = attribution_markdown([record])
+    assert "named people" not in text
+    assert "[NX panel, signal box](<https://commons.wikimedia.org/?curid=1>)" in text
+
+
+def test_manifest_rows_partition_by_panel_group():
+    from rail_vision_bench.dataset.sources import manifest_rows
+    from rail_vision_bench.dataset.splits import assign_partition
+
+    records = [
+        _record("a", status=CurationStatus.ACCEPTED, panel_group="nl-x", display_url="u"),
+        _record("b", status=CurationStatus.ACCEPTED, panel_group="nl-x"),
+        _record("c", status=CurationStatus.REJECTED),
+    ]
+    rows = manifest_rows(records, "s1", data_dir=Path("data"), source_kind=SourceKind.PANEL_PHOTO)
+    assert [row.scene_id for row in rows] == ["a", "b"]
+    assert {row.partition for row in rows} == {assign_partition("nl-x")}
+    assert rows[0].source_url == "u"
+    assert rows[0].gt == "data/gt/s1/a.json"
+    assert rows[0].panel_group == "nl-x"

@@ -50,18 +50,19 @@ end says what exists today; everything else is design that the stubs' docstrings
 | `settings` | `Settings` (pydantic-settings, `SecretStr` keys, `RVB_*` knobs), `get_settings()` | implemented |
 | `config` | `ProviderName`, `Mode`, `TrackerKind`, `ModelConfig`/`ModelCatalogue`, `TaskConfig`, `RunConfig`, loaders, `apply_overrides`, `resolve_run` | implemented |
 | `cli` | typer app `bench` (see the README table) | implemented; stubbed stages exit 3 |
-| `runner` | `RUN_LAYOUT`, `run_dir()`; `run_benchmark`, `evaluate_run`, `build_report` | contract real; orchestration stubbed |
+| `runner` | `RUN_LAYOUT`, `run_dir()`; `run_benchmark` (single-shot, resumable, retries), `evaluate_run`, `build_report` | contract and single-shot runs real; agentic mode, eval and report stubbed |
 | `schema.models` / `schema.issues` / `schema.export` / `schema.validate` | v0 models and enums; `IssueCode`, `ValidationIssue`, `ValidationReport`; JSON Schema export; jsonschema wrapper | implemented |
 | `graph.rules` / `graph.build` / `graph.validator` / `graph.generate` | rules tables; `to_networkx`; rules 1-15; valid-by-construction generator | implemented |
 | `providers.base` / `providers.registry` | `ImageInput`, `Usage`, `VisionRequest`, `VisionResponse`, `VisionProvider`; lazy factories, `get_provider` | implemented |
-| `providers.claude`, `openai_compat`, `gemini`, `mistral`, `ollama_local`, `litellm_router` | one class each; `complete()` | stubbed (no SDK imported) |
+| `providers.claude`, `openai_compat`, `gemini`, `mistral`, `ollama_local`, `litellm_router` | one class each; `complete()` | `openai_compat` real (httpx; OpenRouter, vLLM, OpenAI); the rest stubbed |
 | `agents.state` / `agents.nodes` / `agents.graph` / `agents.prompts` | `AgentState`, `NODE_NAMES`; six nodes + router; `build_agent_graph`; `PROMPT_NAMES`, `load_prompt` | wiring, router and prompts real; nodes stubbed |
-| `agents.single_shot` / `agents.deep` | baseline runner; deepagents variant | stubbed |
+| `agents.single_shot` / `agents.deep` | prompt split, image downscaling, lenient JSON extraction, geometry rescaling, `run_single_shot`; deepagents variant | single-shot real; deep stubbed |
 | `tools.tools` / `tools.mcp_server` | `TOOL_NAMES`, `ToolResult`, `crop`/`read`/`validate`/`render`; `serve_mcp` | `validate_tool` real; rest stubbed |
 | `ingest.image` / `video` / `screen` / `preprocess` / `quality` | loaders, `Frame`, capture, OpenCV helpers, `QualityMetrics` + `measure` | `Frame` and `QualityMetrics` real; functions stubbed |
 | `ingest.commons` | Wikimedia Commons search and download with the licence allow-list, staging, `promote`, prototype import | implemented |
 | `synth.generate` / `render` / `augment` | dataset generation, SVG rendering, albumentations presets | stubbed |
-| `eval.records` / `matching` / `metrics` / `aggregate` | `PredictionRecord`, `MetricResult`; `Match`, `match_elements`; `METRIC_NAMES` + functions; `aggregate_run` | models and names real; computations stubbed |
+| `eval.records` / `matching` / `metrics` / `aggregate` | `PredictionRecord`, `MetricResult`; `Match`, `match_elements` (Hungarian, label/kind/geometry cost with a geometry gate); `METRIC_NAMES` + functions; `aggregate_run` | records and matching real; metric computations stubbed |
+| `review.consensus` / `store` / `app` | multi-model consensus drafts with per-element support; draft/work/ground-truth files and `finalize` with per-element provenance; FastAPI review page | implemented |
 | `harness.app` / `models` / `metrics` / `client` | FastAPI app; wire models; Prometheus registry; `HarnessClient` | health/metrics/validate real; frame/stream not served |
 | `dataset.manifest` / `splits` / `hub` | `ManifestRow` + JSONL; `assign_partition`, `difficulty_tier`; Hub push/pull | manifest and splits real; hub stubbed |
 | `dataset.licensing` / `sources` | licence families, allow-list, SPDX mapping; `SourceRecord` + `sources.jsonl`, attribution list | implemented |

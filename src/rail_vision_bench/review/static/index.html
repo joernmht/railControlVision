@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Panel GT Review</title>
+<style>
+:root {
+  --bg: #f6f7f8; --fg: #1b1f23; --muted: #5f6b76; --card: #ffffff; --line: #d8dde2;
+  --accent: #00838f; --ok: #2e7d32; --warn: #e65100; --edit: #1565c0; --add: #6a1b9a;
+  --sel: #d50000; --err: #c62828;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1418; --fg: #e8ecef; --muted: #9aa7b2; --card: #182027; --line: #2b3640;
+          --accent: #4dd0e1; --ok: #66bb6a; --warn: #ffa726; --edit: #64b5f6; --add: #ce93d8;
+          --sel: #ff5252; --err: #ef5350; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line);
+  padding: 8px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+header h1 { font-size: 16px; margin: 0; flex: 1 1 auto; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px;
+  min-height: 38px; cursor: pointer; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.on { outline: 2px solid var(--accent); }
+button.danger { color: var(--err); }
+select, input, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 8px; min-height: 36px; width: 100%; }
+main { padding: 12px; max-width: 1100px; margin: 0 auto; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px; cursor: pointer; }
+.card img { width: 100%; height: 150px; object-fit: cover; border-radius: 6px; background: #000; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); }
+.pill.done { color: var(--ok); border-color: var(--ok); }
+.pill.in_progress { color: var(--edit); border-color: var(--edit); }
+.pill.todo { color: var(--warn); border-color: var(--warn); }
+.muted { color: var(--muted); font-size: 13px; }
+#stage { position: relative; overflow: auto; height: 58vh; background: #000; border-radius: 8px;
+  touch-action: pan-x pan-y pinch-zoom; }
+#canvas { position: relative; transform-origin: 0 0; }
+#canvas img { display: block; width: 100%; user-select: none; -webkit-user-select: none; }
+#overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; align-items: center; }
+.tools select { width: auto; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-top: 8px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+.grid2 label { font-size: 12px; color: var(--muted); display: block; }
+.list { max-height: 40vh; overflow: auto; }
+.row { display: flex; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.row:last-child { border-bottom: 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.issue { color: var(--err); }
+.issue.warning { color: var(--warn); }
+#toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--fg); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; display: none; z-index: 10; max-width: 90vw; }
+@media (min-width: 900px) { #editor { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
+  #stage { height: 80vh; } }
+</style>
+</head>
+<body>
+<header>
+  <button id="back" hidden>&lsaquo; Scenes</button>
+  <h1 id="title">Panel ground-truth review</h1>
+  <span id="savestate" class="muted"></span>
+</header>
+<main>
+  <section id="listview">
+    <p class="muted">Each draft is the consensus of several models. Orange = disputed (low support or
+      the models disagree), green = consensus. Correct, check, then finalize. Unpublished data:
+      tailnet only.</p>
+    <div class="cards" id="cards"></div>
+  </section>
+  <section id="editor" hidden>
+    <div>
+      <div class="tools">
+        <button data-mode="select" class="on">Select</button>
+        <button data-mode="node">+ Node</button>
+        <button data-mode="edge">+ Edge</button>
+        <button data-mode="signal">+ Signal</button>
+        <select id="newkind" aria-label="kind for new elements"></select>
+        <button id="zoomout" aria-label="zoom out">&minus;</button>
+        <button id="zoomin" aria-label="zoom in">+</button>
+        <label class="muted"><input type="checkbox" id="showall" checked style="width:auto;min-height:0"> overlay</label>
+      </div>
+      <div id="stage"><div id="canvas"><img id="img" alt="panel photo"><svg id="overlay"></svg></div></div>
+      <p class="muted" id="hint">Tap an element to edit it.</p>
+    </div>
+    <div>
+      <div class="panel" id="inspector"><span class="muted">Nothing selected.</span></div>
+      <div class="panel">
+        <div class="tabs">
+          <button data-tab="elements" class="on">Elements</button>
+          <button data-tab="suggestions">Suggestions</button>
+          <button data-tab="issues">Issues</button>
+        </div>
+        <div class="list" id="tablist"></div>
+      </div>
+      <div class="panel tools">
+        <button id="checkconsensus">Check all consensus</button>
+        <button id="fillstate">Fill missing state</button>
+        <button id="save">Save</button>
+        <button id="finalize" class="primary">Finalize</button>
+      </div>
+      <div class="panel muted" id="notes"></div>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+"use strict";
+const PORTS = { buffer_stop: ["A"], boundary: ["A"], joint: ["A", "B"],
+  switch: ["toe", "straight", "diverging"], crossing: ["A", "B", "C", "D"], ekw: ["A", "B", "C", "D"], dkw: ["A", "B", "C", "D"] };
+const NODE_KINDS = Object.keys(PORTS);
+const TRACK_KINDS = ["main", "siding", "platform", "yard", "unknown"];
+const SIGNAL_KINDS = ["main", "distant", "shunt", "combined", "repeater", "block_marker", "unknown"];
+const ASPECTS = ["stop", "proceed", "proceed_reduced", "expect_stop", "expect_proceed", "expect_proceed_reduced", "shunt_proceed", "dark", "unknown"];
+const POSITIONS = ["straight", "diverging", "moving", "unknown"];
+const OCC = ["free", "occupied", "unknown"];
+const DERAILER = ["applied", "removed", "unknown"];
+const ROUTE_STATUS = ["not_set", "set", "locked", "releasing", "unknown"];
+const STATE_OF = { nodes: "switches", edges: "tracks", signals: "signals", derailers: "derailers", routes: "routes" };
+const $ = (s) => document.querySelector(s);
+let S = null;   // {id, doc, draft, row, report, sel, mode, pending, zoom, dirty, tab}
+
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = "none"), 2600); }
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) { let d = await r.text(); try { d = JSON.stringify(JSON.parse(d).detail); } catch (_) {} throw new Error(r.status + " " + d); }
+  return r.json();
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// ---------- document helpers ----------
+function fam(doc, f) { return f === "nodes" ? doc.topology.nodes : f === "edges" ? doc.topology.edges : doc[f]; }
+function families() { return ["nodes", "edges", "signals", "derailers", "routes"]; }
+function find(id) { for (const f of families()) { const e = fam(S.doc, f).find((x) => x.id === id); if (e) return [f, e]; } return [null, null]; }
+function review() { S.doc.meta = S.doc.meta || {}; S.doc.meta.review = S.doc.meta.review || {}; return S.doc.meta.review; }
+function checked() { const r = review(); r.checked = r.checked || []; return r.checked; }
+function draftInfo(id) { return (S.draft.meta.review.elements || {})[id]; }
+function strip(o) { if (!o) return o; const c = { ...o }; delete c.confidence; return JSON.stringify(c); }
+function draftElement(id) { for (const f of families()) { const e = fam(S.draft, f).find((x) => x.id === id); if (e) return [f, e]; } return [null, null]; }
+function changed(f, e) {
+  const [df, de] = draftElement(e.id);
+  if (!de) return "added";
+  const st = STATE_OF[f];
+  return strip(de) === strip(e) && strip(S.draft.state[st][e.id]) === strip(S.doc.state[st][e.id]) ? "" : "edited";
+}
+function colour(f, e) {
+  if (S.sel === e.id) return "var(--sel)";
+  const c = changed(f, e);
+  if (c === "added") return "var(--add)";
+  if (c === "edited") return "var(--edit)";
+  const info = draftInfo(e.id);
+  return info && info.status === "consensus" ? "var(--ok)" : "var(--warn)";
+}
+function point(e) {
+  const g = e.geometry || {};
+  if (g.point) return g.point;
+  if (g.bbox) return [(g.bbox[0] + g.bbox[2]) / 2, (g.bbox[1] + g.bbox[3]) / 2];
+  if (g.polyline && g.polyline.length) return g.polyline[Math.floor(g.polyline.length / 2)];
+  return null;
+}
+function nextId(prefix) {
+  const used = new Set(); families().forEach((f) => fam(S.doc, f).forEach((e) => used.add(e.id)));
+  Object.keys(S.draft.meta.review.suggestions || {}).forEach((k) => used.add(k));
+  let i = 1; while (used.has(prefix + "h" + String(i).padStart(3, "0"))) i++; return prefix + "h" + String(i).padStart(3, "0");
+}
+function usedPorts(nodeId) { const u = new Set(); S.doc.topology.edges.forEach((ed) => { if (ed.a.node === nodeId) u.add(ed.a.port); if (ed.b.node === nodeId) u.add(ed.b.port); }); return u; }
+function freePort(node) { const u = usedPorts(node.id); return (PORTS[node.kind] || ["A"]).find((p) => !u.has(p)) || PORTS[node.kind][0]; }
+function dirty() { S.dirty = true; $("#savestate").textContent = "unsaved"; }
+
+// ---------- list view ----------
+async function showList() {
+  S = null; $("#editor").hidden = true; $("#listview").hidden = false; $("#back").hidden = true;
+  $("#title").textContent = "Panel ground-truth review"; $("#savestate").textContent = "";
+  const scenes = await api("/api/scenes");
+  const done = scenes.filter((s) => s.status === "done").length;
+  $("#savestate").textContent = done + " / " + scenes.length + " done";
+  $("#cards").innerHTML = scenes.map((s) => `
+    <div class="card" data-id="${esc(s.scene_id)}">
+      <img loading="lazy" src="/api/scenes/${encodeURIComponent(s.scene_id)}/image" alt="">
+      <div><b>${esc(s.scene_id)}</b> <span class="pill ${s.status}">${s.status.replace("_", " ")}</span></div>
+      <div class="muted">${esc(s.panel_group || "")} &middot; ${s.partition} &middot; ${s.elements} elements, ${s.disputed} disputed</div>
+    </div>`).join("");
+  document.querySelectorAll(".card").forEach((c) => c.onclick = () => { location.hash = c.dataset.id; });
+}
+
+// ---------- editor ----------
+async function openScene(id) {
+  const data = await api("/api/scenes/" + encodeURIComponent(id));
+  S = { id, doc: data.document, draft: data.draft, row: data.row, report: data.report, sel: null,
+        mode: "select", pending: null, zoom: 1, dirty: false, tab: "elements" };
+  $("#listview").hidden = true; $("#editor").hidden = false; $("#back").hidden = false;
+  $("#title").textContent = id + (data.done ? " (done)" : "");
+  $("#savestate").textContent = "";
+  $("#img").src = "/api/scenes/" + encodeURIComponent(id) + "/image";
+  const notes = S.draft.meta.review.notes || {};
+  $("#notes").innerHTML = "<b>Pre-fill</b>: " + esc((S.draft.meta.review.models || []).join(", ")) +
+    " (run " + esc(S.draft.meta.review.prefill_run) + ")" +
+    Object.entries(notes).map(([m, n]) => `<div><i>${esc(m)}</i>: ${esc(n)}</div>`).join("") +
+    `<div>Source: ${esc(S.row.author || "")}, ${esc(S.row.license || "")}</div>`;
+  setMode("select"); render();
+}
+function setMode(m) {
+  S.mode = m; S.pending = null;
+  document.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
+  const ks = m === "node" ? NODE_KINDS : m === "signal" ? SIGNAL_KINDS : m === "edge" ? TRACK_KINDS : [];
+  $("#newkind").innerHTML = ks.map((k) => `<option>${k}</option>`).join(""); $("#newkind").hidden = !ks.length;
+  $("#hint").textContent = { select: "Tap an element to edit it.", node: "Tap the image to place a node.",
+    edge: "Tap the first node, then the second.", signal: "Tap near the track the signal stands at.",
+    move: "Tap the new position." }[m] || "";
+}
+function render() { drawOverlay(); drawInspector(); drawTab(); }
+function drawOverlay() {
+  const W = S.row.width, H = S.row.height, svg = $("#overlay");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("preserveAspectRatio", "none");
+  if (!$("#showall").checked) { svg.innerHTML = ""; return; }
+  const r = Math.max(W, H) / 160, out = [];
+  for (const e of S.doc.topology.edges) {
+    const g = e.geometry && e.geometry.polyline;
+    const pts = g && g.length > 1 ? g : [point(find(e.a.node)[1] || {}), point(find(e.b.node)[1] || {})].filter(Boolean);
+    if (pts.length < 2) continue;
+    out.push(`<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${colour("edges", e)}"
+      stroke-width="${S.sel === e.id ? 6 : 3.5}" vector-effect="non-scaling-stroke" stroke-opacity="0.9"/>`);
+  }
+  for (const n of S.doc.topology.nodes) { const p = point(n); if (!p) continue;
+    out.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${r}" fill="${colour("nodes", n)}" fill-opacity="0.85" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`);
+    if (n.label) out.push(`<text x="${p[0] + r * 1.2}" y="${p[1] - r * 1.2}" font-size="${r * 2.2}" fill="#fff" stroke="#000" stroke-width="0.6" paint-order="stroke">${esc(n.label)}</text>`); }
+  for (const f of ["signals", "derailers"]) for (const s of S.doc[f]) { const p = point(s); if (!p) continue;
+    const q = r * 1.3;
+    out.push(`<polygon points="${p[0]},${p[1] - q} ${p[0] + q},${p[1] + q} ${p[0] - q},${p[1] + q}" fill="${colour(f, s)}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`); }
+  if (S.pending) { const p = point(find(S.pending)[1] || {}); if (p) out.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${r * 2}" fill="none" stroke="var(--sel)" stroke-width="3" vector-effect="non-scaling-stroke"/>`); }
+  svg.innerHTML = out.join("");
+}
+function toImage(ev) {
+  const rect = $("#overlay").getBoundingClientRect();
+  return [(ev.clientX - rect.left) / rect.width * S.row.width, (ev.clientY - rect.top) / rect.height * S.row.height];
+}
+function segDist(p, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy;
+  const t = L ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L)) : 0;
+  return [Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy), t]; }
+function edgePoints(e) { const g = e.geometry && e.geometry.polyline; if (g && g.length > 1) return g;
+  return [point(find(e.a.node)[1] || {}), point(find(e.b.node)[1] || {})].filter(Boolean); }
+function nearestEdge(p) {
+  let best = null;
+  for (const e of S.doc.topology.edges) { const pts = edgePoints(e); if (pts.length < 2) continue;
+    let total = 0; const lens = []; for (let i = 1; i < pts.length; i++) { lens.push(Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); total += lens[i - 1]; }
+    let walked = 0;
+    for (let i = 1; i < pts.length; i++) { const [d, t] = segDist(p, pts[i - 1], pts[i]);
+      if (!best || d < best.d) best = { e, d, offset: total ? (walked + t * lens[i - 1]) / total : 0.5 }; walked += lens[i - 1]; } }
+  return best;
+}
+function hit(p) {
+  const tol = Math.max(S.row.width, S.row.height) / 45 / S.zoom; let best = null;
+  const consider = (id, d) => { if (d < tol && (!best || d < best.d)) best = { id, d }; };
+  for (const n of S.doc.topology.nodes) { const q = point(n); if (q) consider(n.id, Math.hypot(q[0] - p[0], q[1] - p[1]) * 0.7); }
+  for (const f of ["signals", "derailers"]) for (const s of S.doc[f]) { const q = point(s); if (q) consider(s.id, Math.hypot(q[0] - p[0], q[1] - p[1]) * 0.7); }
+  const ne = nearestEdge(p); if (ne) consider(ne.e.id, ne.d);
+  return best && best.id;
+}
+$("#overlay").addEventListener("click", (ev) => {
+  if (!S) return; const p = toImage(ev).map((v) => Math.round(v * 10) / 10);
+  if (S.mode === "select") { S.sel = hit(p); render(); return; }
+  if (S.mode === "move") { const [, e] = find(S.sel); if (e) { e.geometry = { ...(e.geometry || {}), point: p }; delete e.geometry.bbox; dirty(); } setMode("select"); render(); return; }
+  if (S.mode === "node") { const kind = $("#newkind").value, id = nextId("n");
+    S.doc.topology.nodes.push({ id, kind, half_labels: [], geometry: { point: p } });
+    if (["switch", "dkw", "ekw"].includes(kind)) S.doc.state.switches[id] = kind === "switch" ? { position: "unknown" } : {};
+    S.sel = id; dirty(); render(); return; }
+  if (S.mode === "edge") { const id = hit(p); const [f, n] = find(id || "");
+    if (f !== "nodes") { toast("Tap a node."); return; }
+    if (!S.pending) { S.pending = n.id; render(); return; }
+    if (S.pending === n.id) { S.pending = null; render(); return; }
+    const a = find(S.pending)[1], eid = nextId("e");
+    S.doc.topology.edges.push({ id: eid, kind: $("#newkind").value, a: { node: a.id, port: freePort(a) }, b: { node: n.id, port: freePort(n) },
+      geometry: { polyline: [point(a), point(n)] } });
+    S.doc.state.tracks[eid] = { occupancy: "unknown" }; S.pending = null; S.sel = eid; dirty(); render(); return; }
+  if (S.mode === "signal") { const ne = nearestEdge(p); if (!ne) { toast("Draw the track first."); return; }
+    const id = nextId("s");
+    S.doc.signals.push({ id, kind: $("#newkind").value, at: { edge: ne.e.id, offset: Math.round(ne.offset * 1000) / 1000, direction: "a_to_b" }, geometry: { point: p } });
+    S.doc.state.signals[id] = { aspect: "unknown" }; S.sel = id; dirty(); render(); }
+});
+
+// ---------- inspector ----------
+function sel(name, opts, value, nullable) {
+  return `<select data-k="${name}">${nullable ? `<option value="">(none)</option>` : ""}${opts.map((o) => `<option ${String(o) === String(value) ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+}
+function inp(name, value, type) { return `<input data-k="${name}" ${type ? `type="${type}" step="0.01"` : ""} value="${esc(value ?? "")}">`; }
+function field(label, html) { return `<div><label>${label}</label>${html}</div>`; }
+function drawInspector() {
+  const box = $("#inspector"); const [f, e] = find(S.sel || "");
+  if (!e) { box.innerHTML = `<span class="muted">Nothing selected. Elements: ${S.doc.topology.nodes.length} nodes, ${S.doc.topology.edges.length} edges, ${S.doc.signals.length} signals.</span>`; return; }
+  const st = S.doc.state[STATE_OF[f]][e.id] || {}; const info = draftInfo(e.id);
+  const nodeIds = S.doc.topology.nodes.map((n) => n.id), edgeIds = S.doc.topology.edges.map((x) => x.id);
+  let h = `<div><b>${esc(e.id)}</b> <span class="muted">${f.slice(0, -1)}${info ? ` &middot; ${info.support}/${info.of} models (${esc(info.models.join(", "))})${info.disagree.length ? ` &middot; disagree: ${esc(info.disagree.join(", "))}` : ""}` : changed(f, e) === "added" ? " &middot; added by you" : ""}</span></div><div class="grid2">`;
+  if (f === "nodes") {
+    h += field("kind", sel("kind", NODE_KINDS, e.kind)) + field("label", inp("label", e.label));
+    if (["dkw", "ekw"].includes(e.kind)) h += field("half labels (a,b)", inp("half_labels", (e.half_labels || []).join(",")));
+    if (e.kind === "switch") h += field("position", sel("s.position", POSITIONS, st.position, true)) + field("panel shows (raw)", inp("s.raw", st.raw));
+    if (["dkw", "ekw"].includes(e.kind)) h += field("active paths (A-C,B-D)", inp("s.active_paths", (st.active_paths || []).map((p) => p.join("-")).join(","))) + field("panel shows (raw)", inp("s.raw", st.raw));
+  } else if (f === "edges") {
+    const pa = PORTS[(find(e.a.node)[1] || {}).kind] || ["A"], pb = PORTS[(find(e.b.node)[1] || {}).kind] || ["A"];
+    h += field("kind", sel("kind", TRACK_KINDS, e.kind)) + field("label", inp("label", e.label)) +
+      field("a node", sel("a.node", nodeIds, e.a.node)) + field("a port", sel("a.port", pa, e.a.port)) +
+      field("b node", sel("b.node", nodeIds, e.b.node)) + field("b port", sel("b.port", pb, e.b.port)) +
+      field("occupancy", sel("s.occupancy", OCC, st.occupancy)) + field("route set", sel("s.route_set", ["true", "false"], st.route_set, true));
+  } else if (f === "signals" || f === "derailers") {
+    if (f === "signals") h += field("kind", sel("kind", SIGNAL_KINDS, e.kind)) + field("system", inp("system", e.system));
+    h += field("label", inp("label", e.label)) + field("on edge", sel("at.edge", edgeIds, e.at.edge)) +
+      field("offset 0..1", inp("at.offset", e.at.offset, "number")) + field("governs", sel("at.direction", ["a_to_b", "b_to_a"], e.at.direction));
+    h += f === "signals" ? field("aspect", sel("s.aspect", ASPECTS, st.aspect)) + field("panel shows (raw)", inp("s.raw", st.raw))
+                         : field("position", sel("s.position", DERAILER, st.position));
+  } else {
+    h += field("label", inp("label", e.label)) + field("start signal", inp("start", e.start)) + field("end", inp("end", e.end)) +
+      field("path (edge ids)", inp("path", e.path.join(","))) + field("switch positions (JSON)", inp("switch_positions", JSON.stringify(e.switch_positions || {}))) +
+      field("status", sel("s.status", ROUTE_STATUS, st.status));
+  }
+  h += `</div><div class="tools">
+    <button id="chk" class="${checked().includes(e.id) ? "on" : ""}">${checked().includes(e.id) ? "&check; Checked" : "Mark checked"}</button>
+    ${["nodes", "signals", "derailers"].includes(f) ? `<button id="mv">Move</button>` : ""}
+    ${f === "edges" ? `<button id="straighten">Straight line</button>` : ""}
+    <button id="del" class="danger">Delete</button></div>`;
+  box.innerHTML = h;
+  box.querySelectorAll("[data-k]").forEach((el) => el.onchange = () => { applyField(f, e, el.dataset.k, el.value); dirty(); render(); });
+  $("#chk").onclick = () => { const c = checked(); const i = c.indexOf(e.id); i < 0 ? c.push(e.id) : c.splice(i, 1); dirty(); render(); };
+  $("#del").onclick = () => { const list = fam(S.doc, f); list.splice(list.indexOf(e), 1); delete S.doc.state[STATE_OF[f]][e.id]; S.sel = null; dirty(); render(); };
+  if ($("#mv")) $("#mv").onclick = () => setMode("move");
+  if ($("#straighten")) $("#straighten").onclick = () => { e.geometry = { polyline: [point(find(e.a.node)[1]), point(find(e.b.node)[1])] }; dirty(); render(); };
+}
+function applyField(f, e, k, v) {
+  const stKey = STATE_OF[f]; const st = (S.doc.state[stKey][e.id] = S.doc.state[stKey][e.id] || {});
+  const opt = (x) => (x === "" ? undefined : x);
+  if (k.startsWith("s.")) { const sk = k.slice(2);
+    if (sk === "route_set") st.route_set = v === "" ? null : v === "true";
+    else if (sk === "active_paths") st.active_paths = v.split(",").map((p) => p.trim()).filter(Boolean).map((p) => p.split("-").map((x) => x.trim()));
+    else st[sk] = opt(v);
+    if (st[sk] === undefined) delete st[sk]; return; }
+  if (k === "kind" && f === "nodes") { e.kind = v;
+    if (v === "switch") S.doc.state.switches[e.id] = { position: (st.position || "unknown") };
+    else if (["dkw", "ekw"].includes(v)) { S.doc.state.switches[e.id] = { active_paths: st.active_paths || [] }; }
+    else delete S.doc.state.switches[e.id];
+    if (!["dkw", "ekw"].includes(v)) e.half_labels = []; return; }
+  if (k === "half_labels") { e.half_labels = v.split(",").map((x) => x.trim()).filter(Boolean); return; }
+  if (k === "path") { e.path = v.split(",").map((x) => x.trim()).filter(Boolean); return; }
+  if (k === "switch_positions") { try { e.switch_positions = JSON.parse(v || "{}"); } catch (_) { toast("Not valid JSON."); } return; }
+  if (k.includes(".")) { const [a, b] = k.split("."); e[a][b] = b === "offset" ? Math.max(0, Math.min(1, parseFloat(v) || 0)) : v; return; }
+  if (v === "" && ["label", "system"].includes(k)) delete e[k]; else e[k] = v;
+}
+
+// ---------- tabs ----------
+function drawTab() {
+  const box = $("#tablist"); document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === S.tab));
+  if (S.tab === "elements") {
+    const rows = [];
+    for (const f of families()) for (const e of fam(S.doc, f)) {
+      const info = draftInfo(e.id), c = changed(f, e);
+      const rank = c ? 2 : info && info.status === "disputed" ? 0 : 1;
+      rows.push({ rank, html: `<div class="row" data-id="${esc(e.id)}"><span class="dot" style="background:${colour(f, e)}"></span>
+        <span style="flex:1">${checked().includes(e.id) ? "&check; " : ""}<b>${esc(e.id)}</b> ${esc(e.kind || f.slice(0, -1))} ${esc(e.label || "")}</span>
+        <span class="muted">${info ? info.support + "/" + info.of : c}</span></div>` });
+    }
+    rows.sort((a, b) => a.rank - b.rank);
+    box.innerHTML = rows.map((r) => r.html).join("") || `<span class="muted">No elements.</span>`;
+  } else if (S.tab === "suggestions") {
+    const sug = S.draft.meta.review.suggestions || {};
+    const present = new Set(); families().forEach((f) => fam(S.doc, f).forEach((e) => present.add(e.id)));
+    const items = Object.entries(sug).filter(([id]) => !present.has(id));
+    box.innerHTML = items.map(([id, s]) => `<div class="row"><span class="dot" style="background:var(--muted)"></span>
+      <span style="flex:1"><b>${esc(id)}</b> ${esc(s.family.slice(0, -1))} ${esc(s.element.kind || "")} ${esc(s.element.label || "")}
+      <span class="muted">from ${esc(s.models.join(", "))}</span></span><button data-adopt="${esc(id)}">Adopt</button></div>`).join("")
+      || `<span class="muted">No suggestions left.</span>`;
+    box.querySelectorAll("[data-adopt]").forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); adopt(b.dataset.adopt); });
+  } else {
+    const issues = (S.report && S.report.issues) || [];
+    box.innerHTML = issues.map((i) => `<div class="row" data-id="${esc(i.element_id || "")}"><span class="issue ${i.severity}">${esc(i.code)}</span>
+      <span style="flex:1" class="muted">${esc(i.message)}</span></div>`).join("") || `<span class="muted">No issues${S.report && S.report.ok ? " (strict-valid)" : ""}.</span>`;
+  }
+  box.querySelectorAll(".row[data-id]").forEach((r) => r.onclick = () => { if (r.dataset.id) { S.sel = r.dataset.id; setMode("select"); render(); scrollToSel(); } });
+}
+function scrollToSel() { const [, e] = find(S.sel || ""); const p = e && (point(e) || (e.a && point(find(e.a.node)[1] || {})));
+  if (!p) return; const st = $("#stage"), cv = $("#canvas");
+  st.scrollTo({ left: p[0] / S.row.width * cv.clientWidth - st.clientWidth / 2, top: p[1] / S.row.height * cv.clientHeight - st.clientHeight / 2, behavior: "smooth" }); }
+function adopt(id, seen) {
+  seen = seen || new Set(); if (seen.has(id)) return; seen.add(id);
+  const s = S.draft.meta.review.suggestions[id]; if (!s || find(id)[1]) return;
+  (s.requires || []).forEach((r) => adopt(r, seen));
+  fam(S.doc, s.family).push(JSON.parse(JSON.stringify(s.element)));
+  if (s.state) for (const [k, v] of Object.entries(s.state)) S.doc.state[k][id] = JSON.parse(JSON.stringify(v));
+  S.sel = id; dirty(); render();
+}
+document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { S.tab = b.dataset.tab; drawTab(); });
+document.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => setMode(b.dataset.mode));
+$("#showall").onchange = () => drawOverlay();
+function zoom(f) { S.zoom = Math.max(1, Math.min(8, S.zoom * f)); $("#canvas").style.width = S.zoom * 100 + "%"; }
+$("#zoomin").onclick = () => zoom(1.5); $("#zoomout").onclick = () => zoom(1 / 1.5);
+$("#checkconsensus").onclick = () => { const c = checked(); for (const [id, i] of Object.entries(S.draft.meta.review.elements || {}))
+  if (i.status === "consensus" && find(id)[1] && !c.includes(id)) c.push(id); dirty(); render(); };
+$("#fillstate").onclick = () => { let n = 0;
+  for (const nd of S.doc.topology.nodes) if (["switch", "dkw", "ekw"].includes(nd.kind) && !S.doc.state.switches[nd.id]) { S.doc.state.switches[nd.id] = nd.kind === "switch" ? { position: "unknown" } : {}; n++; }
+  for (const [f, def] of [["edges", { occupancy: "unknown" }], ["signals", { aspect: "unknown" }], ["derailers", { position: "unknown" }], ["routes", { status: "unknown" }]])
+    for (const e of fam(S.doc, f)) if (!S.doc.state[STATE_OF[f]][e.id]) { S.doc.state[STATE_OF[f]][e.id] = { ...def }; n++; }
+  toast(n + " state entries set to unknown"); if (n) dirty(); render(); };
+async function save(final) {
+  try {
+    const r = await api("/api/scenes/" + encodeURIComponent(S.id) + (final ? "/finalize" : "/work"),
+      { method: final ? "POST" : "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(S.doc) });
+    S.report = r.report; S.dirty = false;
+    $("#savestate").textContent = final ? (r.ok ? "finalized" : "not strict-valid") : (r.ok ? "saved, strict-valid" : "saved, " + r.report.issues.length + " issues");
+    if (final && r.ok) toast(`Ground truth written. ${r.summary.prefill_accepted} accepted, ${r.summary.human_edited} edited, ${r.summary.human_added} added.`);
+    if (final && !r.ok) { toast("Fix the issues first."); S.tab = "issues"; }
+    render();
+  } catch (err) { toast("Save failed: " + err.message); }
+}
+$("#save").onclick = () => save(false); $("#finalize").onclick = () => save(true);
+$("#back").onclick = () => { if (S && S.dirty && !confirm("Leave without saving?")) return; location.hash = ""; };
+window.addEventListener("beforeunload", (ev) => { if (S && S.dirty) { ev.preventDefault(); ev.returnValue = ""; } });
+function route() { const id = decodeURIComponent(location.hash.slice(1)); (id ? openScene(id) : showList()).catch((e) => toast(e.message)); }
+window.addEventListener("hashchange", route); route();
+</script>
+</body>
+</html>

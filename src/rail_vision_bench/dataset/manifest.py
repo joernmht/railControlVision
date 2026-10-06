@@ -69,3 +69,13 @@ def write_manifest(rows: Sequence[ManifestRow], path: Path) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"".join(orjson.dumps(row.model_dump(mode="json")) + b"\n" for row in rows))
+
+
+def manifest_path(data_dir: Path, split: str) -> Path:
+    """Return where a split's manifest lives: ``<data_dir>/gt/<split>/manifest.jsonl``."""
+    return data_dir / "gt" / split / "manifest.jsonl"
+
+
+def gt_path(data_dir: Path, split: str, scene_id: str) -> Path:
+    """Return where a scene's ground truth lives: ``<data_dir>/gt/<split>/<scene_id>.json``."""
+    return data_dir / "gt" / split / f"{scene_id}.json"

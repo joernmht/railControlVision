@@ -7,6 +7,7 @@ from typing import Final
 
 PROMPT_NAMES: Final[tuple[str, ...]] = (
     "single_shot",
+    "prefill",
     "agentic/planner",
     "agentic/reader",
     "agentic/interpreter",

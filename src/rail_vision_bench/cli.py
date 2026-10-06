@@ -29,6 +29,8 @@ schema_app = typer.Typer(no_args_is_help=True, help="Schema tools.")
 app.add_typer(schema_app, name="schema")
 synth_app = typer.Typer(no_args_is_help=True, help="Synthetic data.")
 app.add_typer(synth_app, name="synth")
+review_app = typer.Typer(no_args_is_help=True, help="Ground-truth review (drafts, review page).")
+app.add_typer(review_app, name="review")
 commons_app = typer.Typer(no_args_is_help=True, help="Wikimedia Commons source images.")
 app.add_typer(commons_app, name="commons")
 
@@ -212,8 +214,19 @@ def run(
         bool,
         typer.Option("--dry-run", help="Resolve and print the configuration without running."),
     ] = False,
+    retry_failed: Annotated[
+        bool,
+        typer.Option("--retry-failed", help="Re-attempt scenes whose last attempt failed."),
+    ] = False,
+    concurrency: Annotated[
+        int, typer.Option("--concurrency", min=1, help="Parallel requests per model.")
+    ] = 3,
 ) -> None:
-    """Run the benchmark described by a config file (or only resolve it with --dry-run)."""
+    """Run the benchmark described by a config file (or only resolve it with --dry-run).
+
+    A run is resumable: rerunning the same config skips (scene, model) pairs that already
+    have a record in ``predictions.jsonl``.
+    """
     import yaml
 
     from rail_vision_bench import runner
@@ -236,9 +249,13 @@ def run(
         typer.echo(yaml.safe_dump(run_config.model_dump(mode="json"), sort_keys=False), nl=False)
         return
     try:
-        written = runner.run_benchmark(run_config)
+        written = runner.run_benchmark(
+            run_config, retry_failed=retry_failed, concurrency=concurrency
+        )
     except NotImplementedError as exc:
         _not_implemented(exc)
+    except (FileNotFoundError, KeyError) as exc:
+        _fail(f"{config}: {_describe(exc)}")
     console.print(f"run written to {written}", highlight=False)
 
 
@@ -431,6 +448,29 @@ def commons_blur(
     console.print(f"{source_id}: blurred {len(boxes)} region(s)", highlight=False)
 
 
+@commons_app.command("manifest")
+def commons_manifest(
+    split: Annotated[str, typer.Option("--split", help="Split name.")] = "panel_photo_v1",
+    dest: Annotated[Path, typer.Option("--dest", help="Source directory.")] = DEFAULT_COMMONS_DIR,
+) -> None:
+    """Write the split manifest (data/gt/<split>/manifest.jsonl) from the accepted images."""
+    from rail_vision_bench.dataset.manifest import manifest_path, write_manifest
+    from rail_vision_bench.dataset.sources import manifest_rows, read_sources
+    from rail_vision_bench.schema.models import SourceKind
+    from rail_vision_bench.settings import get_settings
+
+    data_dir = get_settings().rvb_data_dir
+    rows = manifest_rows(
+        read_sources(dest / "sources.jsonl"),
+        split,
+        data_dir=data_dir,
+        source_kind=SourceKind.PANEL_PHOTO,
+    )
+    path = manifest_path(data_dir, split)
+    write_manifest(rows, path)
+    console.print(f"{len(rows)} row(s) written to {path}", highlight=False)
+
+
 @commons_app.command("attribution")
 def commons_attribution(
     dest: Annotated[Path, typer.Option("--dest", help="Source directory.")] = DEFAULT_COMMONS_DIR,
@@ -446,6 +486,53 @@ def commons_attribution(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")
     console.print(f"attribution written to {out}", highlight=False)
+
+
+@review_app.command("drafts")
+def review_drafts(
+    run: Annotated[
+        Path, typer.Argument(exists=True, file_okay=False, help="The pre-fill run directory.")
+    ],
+    split: Annotated[str, typer.Option("--split", help="Split name.")] = "panel_photo_v1",
+    overwrite: Annotated[
+        bool, typer.Option("--overwrite", help="Replace existing drafts (work files are kept).")
+    ] = False,
+) -> None:
+    """Merge a pre-fill run into one consensus draft per scene."""
+    import yaml
+
+    from rail_vision_bench.review.store import build_drafts
+    from rail_vision_bench.runner import RUN_LAYOUT, read_predictions
+    from rail_vision_bench.settings import get_settings
+
+    run_config = yaml.safe_load((run / RUN_LAYOUT["config"]).read_text(encoding="utf-8"))
+    written = build_drafts(
+        read_predictions(run / RUN_LAYOUT["predictions"]),
+        data_dir=get_settings().rvb_data_dir,
+        split=split,
+        models=list(run_config["models"]),
+        run_id=str(run_config["name"]),
+        overwrite=overwrite,
+    )
+    console.print(f"{len(written)} draft(s) written", highlight=False)
+
+
+@review_app.command("serve")
+def review_serve(
+    split: Annotated[str, typer.Option("--split", help="Split name.")] = "panel_photo_v1",
+    port: Annotated[int, typer.Option("--port", help="Port on 127.0.0.1.")] = 8790,
+    annotator: Annotated[str, typer.Option("--annotator", help="Recorded in ground truth.")] = (
+        "joern"
+    ),
+) -> None:
+    """Serve the review page on localhost only (reach it over a private tailnet, never publicly)."""
+    import uvicorn
+
+    from rail_vision_bench.review.app import create_review_app
+    from rail_vision_bench.settings import get_settings
+
+    review = create_review_app(get_settings().rvb_data_dir, split, annotator=annotator)
+    uvicorn.run(review, host="127.0.0.1", port=port, log_level="warning")
 
 
 @app.command()

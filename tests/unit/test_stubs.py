@@ -221,7 +221,7 @@ def _resolve(stub: StubRef) -> Any:
 
 def test_discovery_is_non_empty_and_covers_known_stubs():
     labels = {stub.label for stub in STUBS}
-    assert labels >= {"runner.run_benchmark", "providers.claude.AnthropicProvider.complete"}
+    assert labels >= {"runner._run_agentic", "providers.claude.AnthropicProvider.complete"}
     assert len(labels) == len(STUBS)
 
 

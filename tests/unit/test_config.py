@@ -195,9 +195,15 @@ def test_run_layout_and_run_dir():
     assert run_dir(Path("runs"), "2026-09-22-abc") == Path("runs") / "2026-09-22-abc"
 
 
-def test_runner_stubs_raise(tmp_path: Path):
-    with pytest.raises(NotImplementedError, match="run_benchmark"):
-        run_benchmark(_run_config())
+def test_runner_stubs_raise(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    for name, content in (
+        ("task.yaml", "name: t\nsource_kind: synthetic\nsplit: s\n"),
+        ("models.yaml", "models:\n  - {name: m1, provider: ollama, model_id: x}\n"),
+    ):
+        (tmp_path / name).write_text(content, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(NotImplementedError, match="_run_agentic"):
+        run_benchmark(_run_config(mode="agentic"))
     with pytest.raises(NotImplementedError, match="evaluate_run"):
         evaluate_run(tmp_path)
     with pytest.raises(NotImplementedError, match="build_report"):

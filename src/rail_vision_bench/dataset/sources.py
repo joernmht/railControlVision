@@ -17,7 +17,8 @@ from typing import Annotated
 import orjson
 from pydantic import BaseModel, ConfigDict, Field
 
-from rail_vision_bench.schema.models import ElementId
+from rail_vision_bench.dataset.manifest import ManifestRow
+from rail_vision_bench.schema.models import ElementId, SourceKind
 
 
 class CurationStatus(StrEnum):
@@ -49,6 +50,13 @@ class SourceRecord(BaseModel):
     license_url: str | None = None
     description: str | None = None
     search_term: str | None = Field(default=None, description="The query that surfaced it.")
+    display_title: str | None = Field(
+        default=None,
+        description="Title used in public-facing lists instead of `title` (e.g. without names).",
+    )
+    display_url: str | None = Field(
+        default=None, description="Source link used in public-facing lists instead of source_url."
+    )
     panel_group: ElementId | None = Field(
         default=None,
         description="Physical panel or site shown; dev/test splits must keep a group together.",
@@ -132,17 +140,60 @@ def attribution_markdown(records: Sequence[SourceRecord]) -> str:
         "",
     ]
     for record in accepted:
-        title = _md(record.title.removeprefix("File:"))
+        title = _md(record.display_title or record.title.removeprefix("File:"))
         author = _md(record.author) if record.author else "unknown author"
         licence = (
             f"[{_md(record.license_name)}](<{record.license_url}>)"
             if record.license_url
             else _md(record.license_name)
         )
-        entry = f"- `{record.source_id}`: [{title}](<{record.source_url}>) by {author}, {licence}."
+        url = record.display_url or record.source_url
+        entry = f"- `{record.source_id}`: [{title}](<{url}>) by {author}, {licence}."
         if record.credit and record.credit.strip().lower() != "own work":
             entry += f" Credit: {_md(record.credit).rstrip('.')}."
         if record.modification:
             entry += f" Modified ({_md(record.modification)})."
         lines.append(entry)
     return "\n".join(lines) + "\n"
+
+
+def manifest_rows(
+    records: Iterable[SourceRecord], split: str, *, data_dir: Path, source_kind: SourceKind
+) -> list[ManifestRow]:
+    """Build the manifest rows of a split from the accepted source records.
+
+    The partition is drawn from the ``panel_group`` (the ``source_id`` when a record has no
+    group), so all images of one physical panel land in the same partition.
+
+    Args:
+        records: Source records; only ``accepted`` ones become rows.
+        split: The split name, e.g. ``panel_photo_v1``.
+        data_dir: The data root, for the ground-truth paths.
+        source_kind: The source kind of every row.
+
+    Returns:
+        The rows, sorted by ``scene_id``.
+    """
+    from rail_vision_bench.dataset.manifest import gt_path
+    from rail_vision_bench.dataset.splits import assign_partition
+
+    rows = [
+        ManifestRow(
+            scene_id=record.source_id,
+            split=split,
+            partition=assign_partition(record.panel_group or record.source_id),
+            source_kind=source_kind,
+            image=record.image,
+            gt=gt_path(data_dir, split, record.source_id).as_posix(),
+            width=record.width,
+            height=record.height,
+            license=record.license,
+            license_url=record.license_url,
+            author=record.author,
+            source_url=record.display_url or record.source_url,
+            panel_group=record.panel_group,
+        )
+        for record in records
+        if record.status is CurationStatus.ACCEPTED
+    ]
+    return sorted(rows, key=lambda row: row.scene_id)

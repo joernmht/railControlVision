@@ -1,8 +1,11 @@
-# single_shot (schema v0)
+# prefill (schema v0)
 
-Baseline prompt for one model call: one image in, one JSON document out.
-The `## System` section is sent as the system prompt, the `## User` section
-as the user turn together with the image.
+Ground-truth pre-fill prompt: the same task and document format as
+`single_shot`, but tuned for recall, because a human annotator corrects the
+answer afterwards and deleting a wrong element is cheaper than drawing a
+missing one. Used only to seed review drafts; benchmark results use
+`single_shot`. The `## System` section is sent as the system prompt, the
+`## User` section as the user turn together with the image.
 
 ## System
 
@@ -123,21 +126,32 @@ coordinate outside the image. `confidence` is a number from 0.0 to 1.0.
 
 ### Rules
 
-1. Do not guess. When a value cannot be read from the image, use `"unknown"`
-   for enum fields, `null` for optional fields, and lower the `confidence`.
-   Never invent elements to make the graph look complete.
-2. Every edge end must name an existing node and one of its ports; every
-   port is used at most once; a node with fewer or more edges than ports is
-   an error, so leave a node out rather than connect it incorrectly.
-3. Transcribe labels exactly as painted, including letters (`"W12"`, `"N1"`,
+Your answer is a draft that a railway-operations expert will check and
+correct element by element. Missing elements cost them the most time.
+
+1. Transcribe everything visible: every drawn track section, every switch,
+   crossing and slip, every track end, every signal and every label you can
+   read, across the whole panel, not only a part of it. A large panel can
+   easily have 50 to 200 elements; that is expected.
+2. When you are unsure about an element, include it anyway and give it a low
+   `confidence` (0.2 to 0.5) instead of leaving it out. Use `"unknown"` for
+   enum values you cannot read and `null` for unreadable optional fields;
+   never invent a label.
+3. Keep the graph well formed where you can: every edge end names an
+   existing node and one of its ports, and every port is used at most once.
+   Where a track continues beyond what you can follow, end it in a
+   `boundary` node rather than dropping it.
+4. Transcribe labels exactly as painted, including letters (`"W12"`, `"N1"`,
    `"12a"`).
-4. Use the panel's own reading direction: `a` is the left or lower end of
+5. Use the panel's own reading direction: `a` is the left or lower end of
    an edge, `b` the right or upper end, unless the drawing clearly shows
    otherwise.
+6. Put anything that does not fit the format (panel name, station names,
+   unreadable regions) into `meta.notes` as one short string.
 
 ## User
 
-Transcribe this control panel image into one JSON object that conforms to
-schema v0 as described. The scene id is `{scene_id}`, the source kind is
-`{source_kind}`, the image is `{image}` and measures `{width}` x `{height}`
-pixels. Return only the JSON object.
+Transcribe this whole control panel image, every visible element, into one
+JSON object that conforms to schema v0 as described. The scene id is
+`{scene_id}`, the source kind is `{source_kind}`, the image is `{image}` and
+measures `{width}` x `{height}` pixels. Return only the JSON object.

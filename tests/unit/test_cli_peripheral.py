@@ -66,10 +66,10 @@ def test_serve_help(cli: CliRunner):
         assert option in output
 
 
-def test_run_without_dry_run_is_not_implemented(cli: CliRunner, tmp_path: Path):
+def test_run_agentic_is_not_implemented(cli: CliRunner, tmp_path: Path):
     config = _run_config(tmp_path)
-    result = cli.invoke(app, ["run", "--config", str(config)])
+    result = cli.invoke(app, ["run", "--config", str(config), "--mode", "agentic"])
     assert result.exit_code == EXIT_NOT_IMPLEMENTED, result.output
     assert "[not implemented]" in result.output
-    assert "run_benchmark" in result.output
+    assert "_run_agentic" in result.output
     assert not (tmp_path / "runs").exists(), "the stub must not create the run directory"

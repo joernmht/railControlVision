@@ -42,7 +42,7 @@ typing = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-rail_vision_bench = ["py.typed", "prompts/*.md", "prompts/agentic/*.md", "report/templates/*.j2"]
+rail_vision_bench = ["py.typed", "prompts/*.md", "prompts/agentic/*.md", "report/templates/*.j2", "review/static/*.html"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }

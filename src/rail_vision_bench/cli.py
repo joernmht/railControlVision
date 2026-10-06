@@ -358,6 +358,9 @@ def commons_import_db(
 def commons_status(
     source_id: Annotated[str, typer.Argument(help="The record to change.")],
     status: Annotated[str, typer.Argument(help="candidate, accepted or rejected.")],
+    note: Annotated[
+        str | None, typer.Option("--note", help="Reason for the decision (kept per record).")
+    ] = None,
     dest: Annotated[Path, typer.Option("--dest", help="Source directory.")] = (DEFAULT_STAGING_DIR),
 ) -> None:
     """Set the curation status of one source image."""
@@ -369,10 +372,63 @@ def commons_status(
     except ValueError:
         raise typer.BadParameter(f"unknown status {status!r}", param_hint="STATUS") from None
     try:
-        set_status(dest, source_id, new_status)
+        set_status(dest, source_id, new_status, note=note)
     except KeyError:
         _fail(f"no source image {source_id!r} in {dest / 'sources.jsonl'}")
     console.print(f"{source_id}: {new_status}", highlight=False)
+
+
+@commons_app.command("group")
+def commons_group(
+    source_id: Annotated[str, typer.Argument(help="The record to change.")],
+    group: Annotated[str, typer.Argument(help="Panel/site group id, e.g. nl-hilversum.")],
+    dest: Annotated[Path, typer.Option("--dest", help="Source directory.")] = (DEFAULT_STAGING_DIR),
+) -> None:
+    """Set the panel group (physical panel or site) of one source image."""
+    from pydantic import ValidationError
+
+    from rail_vision_bench.ingest.commons import set_group
+
+    try:
+        set_group(dest, source_id, group)
+    except KeyError:
+        _fail(f"no source image {source_id!r} in {dest / 'sources.jsonl'}")
+    except ValidationError:
+        raise typer.BadParameter(f"invalid group id {group!r}", param_hint="GROUP") from None
+    console.print(f"{source_id}: group {group}", highlight=False)
+
+
+def _parse_box(text: str) -> tuple[int, int, int, int]:
+    """Parse ``x0,y0,x1,y1`` into a pixel box."""
+    parts = text.split(",")
+    if len(parts) != 4:
+        raise typer.BadParameter(f"expected x0,y0,x1,y1, got {text!r}", param_hint="--box")
+    try:
+        x0, y0, x1, y1 = (int(part) for part in parts)
+    except ValueError:
+        raise typer.BadParameter(f"non-integer box {text!r}", param_hint="--box") from None
+    return x0, y0, x1, y1
+
+
+@commons_app.command("blur")
+def commons_blur(
+    source_id: Annotated[str, typer.Argument(help="The record whose image to blur.")],
+    box: Annotated[
+        list[str], typer.Option("--box", help="Region x0,y0,x1,y1 in pixels; repeatable.")
+    ],
+    dest: Annotated[Path, typer.Option("--dest", help="Source directory.")] = (DEFAULT_STAGING_DIR),
+) -> None:
+    """Blur faces in a staged image in place and record the modification."""
+    from rail_vision_bench.ingest.commons import blur
+
+    boxes = [_parse_box(text) for text in box]
+    try:
+        blur(dest, source_id, boxes)
+    except KeyError:
+        _fail(f"no source image {source_id!r} in {dest / 'sources.jsonl'}")
+    except ValueError as exc:
+        _fail(str(exc))
+    console.print(f"{source_id}: blurred {len(boxes)} region(s)", highlight=False)
 
 
 @commons_app.command("attribution")

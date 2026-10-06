@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+from PIL import Image
 from typer.testing import CliRunner
 
 from rail_vision_bench.cli import app
@@ -124,7 +126,13 @@ def test_manifest_row_carries_provenance():
     assert row.author == "A. Person"
 
 
-_IMAGE = b"\xff\xd8 fake jpeg bytes"
+def _jpeg(width: int = 64, height: int = 48, color: tuple[int, int, int] = (40, 40, 40)) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height), color).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+_IMAGE = _jpeg()
 
 
 def _page(title: str, licence: str, **info: Any) -> dict[str, Any]:
@@ -155,6 +163,8 @@ def _transport(pages: list[dict[str, Any]]) -> httpx.MockTransport:
             )
         if "missing" in request.url.path:
             return httpx.Response(404)
+        if "notanimage" in request.url.path:
+            return httpx.Response(200, content=b"<html>error page</html>")
         return httpx.Response(200, content=_IMAGE)
 
     return httpx.MockTransport(handler)
@@ -185,7 +195,7 @@ def test_ingest_filters_licences_and_records_provenance(
     assert record.title == "File:Good.jpg"
     assert record.author == "Kim Lee"
     assert record.license == "CC-BY-4.0"
-    assert (record.width, record.height) == (2000, 1333)
+    assert (record.width, record.height) == (64, 48)  # decoded, not the reported thumb size
     assert Path(record.image).read_bytes() == _IMAGE
     assert record.image == f"data/raw/commons/images/commons-{sha[:12]}.jpg"
 
@@ -331,3 +341,123 @@ def test_cli_commons_promote(tmp_path: Path, cli: CliRunner):
     result = cli.invoke(app, ["commons", "promote", "--staging", str(staging), "--dest", str(dest)])
     assert result.exit_code == 0, result.output
     assert "promoted 0 image(s)" in plain(result.output)
+
+
+def test_ingest_extension_comes_from_the_bytes_not_the_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # regression: Commons thumb URLs can end in utm query parameters, which once became the
+    # file "extension" (commons-....orgutmcampaignimageinfoutmcontentthumbnailunscaled)
+    monkeypatch.chdir(tmp_path)
+    utm = (
+        "https://upload.example/thumb/a.jpg/2000px-a.jpg?utm_source=commons.wikimedia.org"
+        "&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+    )
+    pages = [
+        _page("File:Utm.jpg", "CC0", thumburl=utm),
+        _page("File:Html.jpg", "CC0", thumburl="https://upload.example/notanimage.jpg"),
+    ]
+    with httpx.Client(transport=_transport(pages)) as client:
+        counts = commons.ingest(Path("s"), terms=["panel"], client=client, delay_s=0)
+    assert (counts.new, counts.unsuitable) == (1, 1)
+    (record,) = read_sources(Path("s/sources.jsonl"))
+    assert Path(record.image).suffix == ".jpg"
+
+
+def test_sniff_image():
+    assert commons.sniff_image(_IMAGE) == ("jpg", 64, 48)
+    buffer = io.BytesIO()
+    Image.new("RGB", (5, 7)).save(buffer, format="PNG")
+    assert commons.sniff_image(buffer.getvalue()) == ("png", 5, 7)
+    assert commons.sniff_image(b"not an image") is None
+
+
+def _gray(image: Image.Image, xy: tuple[int, int]) -> int:
+    value = image.getpixel(xy)
+    assert isinstance(value, float | int)
+    return int(value)
+
+
+def _staged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.chdir(tmp_path)
+    staging = Path("staging")
+    (staging / "images").mkdir(parents=True)
+    (staging / "images" / "a.jpg").write_bytes(_jpeg(200, 100, (250, 250, 250)))
+    write_sources([_record("a", image="staging/images/a.jpg")], staging / "sources.jsonl")
+    return staging
+
+
+def test_blur_changes_only_the_boxes_and_records_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    staging = _staged(tmp_path, monkeypatch)
+    image_path = staging / "images" / "a.jpg"
+    with Image.open(image_path) as image:
+        drawn = image.convert("RGB")
+    for x in range(20, 60, 4):  # a high-contrast pattern inside the box
+        for y in range(20, 60):
+            drawn.putpixel((x, y), (0, 0, 0))
+    drawn.save(image_path, format="JPEG", quality=95)
+
+    record = commons.blur(staging, "a", [(10, 10, 70, 70), (-5, 90, 20, 200)])
+    assert record.modification == commons.BLUR_MODIFICATION
+    assert record.blur_regions == [(10, 10, 70, 70), (0, 90, 20, 100)]  # clipped
+    assert record.sha256 == hashlib.sha256(image_path.read_bytes()).hexdigest()
+    with Image.open(image_path) as image:
+        assert image.format == "JPEG"
+        gray = image.convert("L")
+        stripe = [_gray(gray, (x, 40)) for x in range(20, 60)]
+        assert max(stripe) - min(stripe) < 60  # the stripes are smeared out
+        assert _gray(gray, (150, 50)) > 240  # outside every box: untouched
+
+    with pytest.raises(ValueError, match="empty"):
+        commons.blur(staging, "a", [(500, 500, 600, 600)])
+    with pytest.raises(KeyError):
+        commons.blur(staging, "zz", [(0, 0, 1, 1)])
+
+    text = attribution_markdown([record.model_copy(update={"status": CurationStatus.ACCEPTED})])
+    assert "Modified (faces blurred)." in text
+
+
+def test_status_note_group_and_promote_withdrawal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    staging = _staged(tmp_path, monkeypatch)
+    commons.set_status(staging, "a", CurationStatus.ACCEPTED, note="clear panel")
+    commons.set_group(staging, "a", "nl-hilversum")
+    (promoted,) = commons.promote(staging, Path("raw"))
+    assert (promoted.curation_note, promoted.panel_group) == ("clear panel", "nl-hilversum")
+    assert Path(promoted.image).is_file()
+
+    record = commons.set_status(staging, "a", CurationStatus.REJECTED, note="near-duplicate")
+    assert record.curation_note == "near-duplicate"
+    assert commons.set_status(staging, "a", CurationStatus.REJECTED).curation_note == (
+        "near-duplicate"
+    )
+    assert commons.promote(staging, Path("raw")) == []
+    assert read_sources(Path("raw/sources.jsonl")) == []
+    assert not Path(promoted.image).exists()
+    with pytest.raises(ValueError, match="panel_group"):
+        commons.set_group(staging, "a", "bad group!")
+
+
+def test_cli_commons_group_blur_and_note(tmp_path: Path, cli: CliRunner):
+    staging = tmp_path / "staging"
+    (staging / "images").mkdir(parents=True)
+    image = staging / "images" / "a.jpg"
+    image.write_bytes(_jpeg(100, 100))
+    write_sources([_record("a", image=str(image))], staging / "sources.jsonl")
+    d = ["--dest", str(staging)]
+
+    result = cli.invoke(app, ["commons", "status", "a", "rejected", "--note", "dup", *d])
+    assert result.exit_code == 0, result.output
+    assert read_sources(staging / "sources.jsonl")[0].curation_note == "dup"
+
+    assert cli.invoke(app, ["commons", "group", "a", "nl-x", *d]).exit_code == 0
+    assert cli.invoke(app, ["commons", "group", "a", "bad id!", *d]).exit_code == 2
+    assert cli.invoke(app, ["commons", "group", "zz", "nl-x", *d]).exit_code == 1
+
+    result = cli.invoke(app, ["commons", "blur", "a", "--box", "0,0,10,10", *d])
+    assert result.exit_code == 0, result.output
+    assert read_sources(staging / "sources.jsonl")[0].blur_regions == [(0, 0, 10, 10)]
+    assert cli.invoke(app, ["commons", "blur", "a", "--box", "1,2,3", *d]).exit_code == 2
+    assert cli.invoke(app, ["commons", "blur", "a", "--box", "a,b,c,d", *d]).exit_code == 2
+    assert cli.invoke(app, ["commons", "blur", "a", "--box", "500,500,600,600", *d]).exit_code == 1

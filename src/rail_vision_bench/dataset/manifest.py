@@ -33,6 +33,10 @@ class ManifestRow(BaseModel):
     source_url: str | None = Field(
         default=None, description="Page documenting where the image came from."
     )
+    panel_group: ElementId | None = Field(
+        default=None,
+        description="Physical panel or site; a future split must keep a group in one partition.",
+    )
     quality: dict[str, float] | None = Field(
         default=None, description="QualityMetrics fields when measured."
     )

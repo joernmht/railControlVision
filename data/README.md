@@ -58,6 +58,7 @@ Each split is described by a `manifest.jsonl`: one JSON object per line, validat
 | `license_url` | string \| null | URL of the licence terms |
 | `author` | string \| null | author to credit for a third-party image |
 | `source_url` | string \| null | page documenting where a third-party image came from |
+| `panel_group` | id \| null | physical panel or site; a dev/test split must keep a group in one partition |
 | `quality` | object \| null | `QualityMetrics` fields (`blur_var`, `glare_fraction`) when measured |
 
 `manifest.example.jsonl` holds the rows for `minimal` and `station_dkw`, whose ground truth are
@@ -123,8 +124,10 @@ must be shared alike, which would bind the derived data, so the main set admits 
 
 ```sh
 bench commons ingest                      # search Commons, stage candidates in data/incoming/commons
-bench commons status <source_id> accepted # curate (or: rejected); edits data/incoming/commons/sources.jsonl
-bench commons promote                     # copy accepted images to data/raw/commons
+bench commons status <source_id> rejected --note "near-duplicate of ..."   # curate, with the reason
+bench commons group <source_id> nl-hilversum                              # panel/site group
+bench commons blur <source_id> --box x0,y0,x1,y1 [--box ...]               # faces, in staging only
+bench commons promote                     # sync data/raw/commons with the accepted staged images
 bench commons attribution --out data/ATTRIBUTION.md
 cp data/ATTRIBUTION.md data/raw/commons/ATTRIBUTION.md   # the credits travel with the images
 dvc add data/raw && dvc push              # then commit data/raw.dvc and data/ATTRIBUTION.md
@@ -134,8 +137,21 @@ Each image is described by a `SourceRecord` line in `sources.jsonl` (`rail_visio
 `source_id` (`commons-<first 12 hex of sha256>`), curation `status`, `image`, `sha256`, `width`,
 `height`, Commons `title`, `source_url`, `file_url`, `author`, `credit`, `license` (SPDX or a
 `LicenseRef-` id), `license_name` (as Commons states it), `license_url`, `description`,
-`search_term` and `ingested_at`. Candidates that show identifiable people stay in staging until
-they are blurred (rule 2). `bench commons import-db` migrates the accepted images of the
+`search_term`, `ingested_at`, `panel_group`, `curation_note`, `modification` and
+`blur_regions`. `sha256` is the hash of the file as stored (after blurring); `source_id` keeps
+naming the original download.
+
+- **Panel groups.** `panel_group` names the physical panel or site an image shows (site level,
+  e.g. `nl-hilversum`, `dk-padborg`). Several images show the same panel, so any dev/test split
+  must assign whole groups to one partition, never single images, or it leaks; `ManifestRow`
+  carries the same field.
+- **Blurring.** Identifiable people are blurred in staging before promotion (rule 2): `bench
+  commons blur` overwrites the staged file, so the unblurred original never reaches the data
+  plane or the DVC remote. Boxes are placed by hand and checked visually; they are kept in
+  `blur_regions`. Blurring is an adaptation, so `modification` is set to `faces blurred` and the
+  attribution entry says *Modified (faces blurred)*.
+- **Promotion is a sync.** A record that is no longer accepted in staging is removed from
+  `data/raw/commons`, image included. `bench commons import-db` migrates the accepted images of the
 raiLPoperator `panelvision` prototype. None of these images has ground truth yet, so they have
 no manifest rows; when a scene gets a `SceneAnnotation`, its row copies `license`,
 `license_url`, `author` and `source_url` from the source record.

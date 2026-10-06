@@ -19,6 +19,7 @@ migrates that prototype's accepted images.
 from __future__ import annotations
 
 import hashlib
+import io
 import re
 import shutil
 import sqlite3
@@ -30,6 +31,7 @@ from pathlib import Path
 from typing import Any, Final
 
 import httpx
+from PIL import Image, ImageFilter, UnidentifiedImageError
 
 from rail_vision_bench import __version__
 from rail_vision_bench.dataset.licensing import (
@@ -85,7 +87,17 @@ THUMB_WIDTH: Final = 2000
 
 _EXT_METADATA: Final = "LicenseShortName|LicenseUrl|Artist|Credit|ImageDescription"
 _TAG_RE: Final = re.compile(r"<[^>]+>")
-_UNSAFE_RE: Final = re.compile(r"[^a-z0-9]+")
+
+IMAGE_EXTENSIONS: Final[Mapping[str, str]] = {
+    "JPEG": "jpg",
+    "PNG": "png",
+    "WEBP": "webp",
+    "TIFF": "tif",
+}
+"""File extension per Pillow format; the extension is never taken from the URL."""
+
+BLUR_MODIFICATION: Final = "faces blurred"
+"""The ``modification`` recorded by :func:`blur`, quoted in the attribution list."""
 
 
 @dataclass
@@ -122,6 +134,25 @@ def _meta(extmeta: Mapping[str, Any], key: str) -> str | None:
     """Return one ``extmetadata`` field as plain text."""
     entry = extmeta.get(key)
     return _plain(entry.get("value")) if isinstance(entry, Mapping) else None
+
+
+def sniff_image(body: bytes) -> tuple[str, int, int] | None:
+    """Return ``(extension, width, height)`` decoded from image bytes.
+
+    Args:
+        body: The downloaded bytes.
+
+    Returns:
+        The extension for the Pillow format and the pixel size, or ``None`` when the bytes are
+        not an image in one of :data:`IMAGE_EXTENSIONS`.
+    """
+    try:
+        with Image.open(io.BytesIO(body)) as image:
+            extension = IMAGE_EXTENSIONS.get(image.format or "")
+            size = image.size
+    except UnidentifiedImageError:
+        return None
+    return None if extension is None else (extension, size[0], size[1])
 
 
 def licence_url_for(name: str | None, stated: str | None) -> str | None:
@@ -255,22 +286,26 @@ def _fetch(
         counts.failed += 1
         return None
     body = response.content
+    sniffed = sniff_image(body)
+    if sniffed is None:
+        counts.unsuitable += 1
+        return None
+    extension, width, height = sniffed
     sha = hashlib.sha256(body).hexdigest()
     source_id = source_id_for(sha)
     if source_id in records:
         counts.duplicate += 1  # the same bytes under another title
         return None
 
-    suffix = file_url.rsplit(".", 1)[-1].lower()
     images_dir.mkdir(parents=True, exist_ok=True)
-    local = images_dir / f"{source_id}.{_UNSAFE_RE.sub('', suffix) or 'jpg'}"
+    local = images_dir / f"{source_id}.{extension}"
     local.write_bytes(body)
     return SourceRecord(
         source_id=source_id,
         image=local.as_posix(),
         sha256=sha,
-        width=int(info.get("thumbwidth") or info["width"]),
-        height=int(info.get("thumbheight") or info["height"]),
+        width=width,
+        height=height,
         title=title,
         source_url=str(info.get("descriptionurl", f"https://commons.wikimedia.org/wiki/{title}")),
         file_url=file_url,
@@ -352,13 +387,28 @@ def import_panelvision_db(
     return sorted(imported, key=lambda record: record.source_id)
 
 
-def set_status(dest: Path, source_id: str, status: CurationStatus) -> SourceRecord:
-    """Set the curation status of one record in ``<dest>/sources.jsonl``.
+def _update(dest: Path, source_id: str, **changes: Any) -> SourceRecord:
+    """Apply ``changes`` to one record of ``<dest>/sources.jsonl`` and validate it."""
+    sources_path = dest / "sources.jsonl"
+    records = {record.source_id: record for record in read_sources(sources_path)}
+    if source_id not in records:
+        raise KeyError(source_id)
+    updated = SourceRecord.model_validate({**records[source_id].model_dump(), **changes})
+    records[source_id] = updated
+    write_sources(records.values(), sources_path)
+    return updated
+
+
+def set_status(
+    dest: Path, source_id: str, status: CurationStatus, *, note: str | None = None
+) -> SourceRecord:
+    """Set the curation status (and optionally the reason) of one record.
 
     Args:
         dest: The source directory.
         source_id: The record to change.
         status: The new status.
+        note: Why, e.g. the reason for a rejection; ``None`` keeps the current note.
 
     Returns:
         The updated record.
@@ -366,22 +416,79 @@ def set_status(dest: Path, source_id: str, status: CurationStatus) -> SourceReco
     Raises:
         KeyError: If no record has that id.
     """
-    sources_path = dest / "sources.jsonl"
-    records = {record.source_id: record for record in read_sources(sources_path)}
-    if source_id not in records:
+    changes: dict[str, Any] = {"status": status}
+    if note is not None:
+        changes["curation_note"] = note
+    return _update(dest, source_id, **changes)
+
+
+def set_group(dest: Path, source_id: str, group: str) -> SourceRecord:
+    """Set the panel group (physical panel or site) of one record.
+
+    Raises:
+        KeyError: If no record has that id.
+    """
+    return _update(dest, source_id, panel_group=group)
+
+
+def blur(dest: Path, source_id: str, boxes: Iterable[tuple[int, int, int, int]]) -> SourceRecord:
+    """Blur regions (faces) of one image in place and record the modification.
+
+    The original bytes are overwritten, so run this in staging, never on a file whose
+    original must be kept; Commons still holds the original. Each box is blurred with a
+    Gaussian whose radius scales with the box, which leaves no recognisable face at any
+    size. ``source_id`` keeps naming the original download; ``sha256``, ``blur_regions`` and
+    ``modification`` describe the file as it is now.
+
+    Args:
+        dest: The source directory.
+        source_id: The record whose image to blur.
+        boxes: ``(x0, y0, x1, y1)`` pixel boxes, clipped to the image.
+
+    Returns:
+        The updated record.
+
+    Raises:
+        KeyError: If no record has that id.
+        ValueError: If a box is empty after clipping.
+    """
+    record = {r.source_id: r for r in read_sources(dest / "sources.jsonl")}.get(source_id)
+    if record is None:
         raise KeyError(source_id)
-    updated = records[source_id].model_copy(update={"status": status})
-    records[source_id] = updated
-    write_sources(records.values(), sources_path)
-    return updated
+    path = Path(record.image)
+    with Image.open(path) as opened:
+        fmt = opened.format
+        image = opened.convert("RGB")
+    clipped: list[tuple[int, int, int, int]] = []
+    for x0, y0, x1, y1 in boxes:
+        box = (max(0, x0), max(0, y0), min(image.width, x1), min(image.height, y1))
+        if box[0] >= box[2] or box[1] >= box[3]:
+            msg = f"{source_id}: box {(x0, y0, x1, y1)} is empty inside the image"
+            raise ValueError(msg)
+        region = image.crop(box)
+        radius = max(8, max(region.size) // 6)
+        image.paste(region.filter(ImageFilter.GaussianBlur(radius)), box[:2])
+        clipped.append(box)
+    buffer = io.BytesIO()
+    image.save(buffer, format=fmt or "JPEG", quality=92)
+    body = buffer.getvalue()
+    path.write_bytes(body)
+    return _update(
+        dest,
+        source_id,
+        sha256=hashlib.sha256(body).hexdigest(),
+        modification=BLUR_MODIFICATION,
+        blur_regions=[*record.blur_regions, *clipped],
+    )
 
 
 def promote(src: Path, dest: Path) -> list[SourceRecord]:
-    """Copy the accepted records of a staging directory into the data-plane directory.
+    """Synchronise the data-plane directory with the curation decisions of the staging one.
 
-    The image is copied to ``<dest>/images/`` and the record's ``image`` path rewritten;
-    records already in ``<dest>/sources.jsonl`` are replaced. The staging copy stays, so a
-    later ingest still knows the title.
+    Accepted staging records are copied to ``<dest>/images/`` with the record's ``image`` path
+    rewritten (replacing an earlier copy). A record that is in both places but no longer
+    accepted in staging is removed from ``dest``, image included. The staging copy stays, so
+    a later ingest still knows the title.
 
     Args:
         src: The staging source directory.
@@ -394,6 +501,9 @@ def promote(src: Path, dest: Path) -> list[SourceRecord]:
     promoted: list[SourceRecord] = []
     for record in read_sources(src / "sources.jsonl"):
         if record.status is not CurationStatus.ACCEPTED:
+            withdrawn = records.pop(record.source_id, None)
+            if withdrawn is not None:
+                Path(withdrawn.image).unlink(missing_ok=True)
             continue
         local = dest / "images" / Path(record.image).name
         local.parent.mkdir(parents=True, exist_ok=True)
